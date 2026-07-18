@@ -1,0 +1,8 @@
+node_modules
+dist
+.env
+*.log
+
+# SQLite database - contains real household data, not source
+server/prisma/dev.db
+server/prisma/dev.db-journal

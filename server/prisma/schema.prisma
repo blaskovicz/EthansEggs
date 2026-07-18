@@ -1,0 +1,58 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  CHILD
+  PARENT
+}
+
+model User {
+  id           String   @id @default(cuid())
+  name         String   @unique
+  role         Role
+  passwordHash String
+  color        String   @default("#6366f1")
+  createdAt    DateTime @default(now())
+
+  collections      EggCollection[] @relation("CollectorUser")
+  paymentsReceived Payment[]       @relation("PaymentToChild")
+  paymentsRecorded Payment[]       @relation("PaymentRecordedBy")
+}
+
+// Append-only log of every day a person marked they collected/helped collect eggs.
+// One row per (user, date) - a unique constraint prevents double-claiming the same day.
+model EggCollection {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation("CollectorUser", fields: [userId], references: [id])
+  date        String // YYYY-MM-DD, local calendar day
+  note        String?
+  createdAt   DateTime @default(now())
+
+  @@unique([userId, date])
+}
+
+// Append-only log of every payment made toward a child's balance.
+model Payment {
+  id              String   @id @default(cuid())
+  childId         String
+  child           User     @relation("PaymentToChild", fields: [childId], references: [id])
+  amountCents     Int
+  note            String?
+  recordedById    String
+  recordedBy      User     @relation("PaymentRecordedBy", fields: [recordedById], references: [id])
+  createdAt       DateTime @default(now())
+}
+
+// Single-row app-wide configuration (currently just the per-collection rate).
+model Settings {
+  id            Int    @id @default(1)
+  rateCents     Int    @default(100)
+  updatedAt     DateTime @updatedAt
+}
