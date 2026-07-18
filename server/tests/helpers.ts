@@ -7,6 +7,13 @@ import type { AuthTokenPayload } from "../src/middleware/auth";
 const COOKIE_NAME = "eggs_session";
 
 export async function resetDb() {
+  // Last line of defense: never wipe anything that isn't obviously the
+  // disposable test database, no matter how DATABASE_URL got set.
+  const dbUrl = process.env.DATABASE_URL ?? "";
+  if (!dbUrl.includes("test.db")) {
+    throw new Error(`resetDb() refused to run: DATABASE_URL ("${dbUrl}") is not the test database.`);
+  }
+
   await prisma.payment.deleteMany();
   await prisma.eggCollection.deleteMany();
   await prisma.settings.deleteMany();
