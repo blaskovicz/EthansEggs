@@ -5,6 +5,11 @@ export async function getRateCents(): Promise<number> {
   return settings?.rateCents ?? 100;
 }
 
+export async function getChickenCount(): Promise<number> {
+  const settings = await prisma.settings.findUnique({ where: { id: 1 } });
+  return settings?.chickenCount ?? 30;
+}
+
 export interface ChildBalance {
   userId: string;
   name: string;

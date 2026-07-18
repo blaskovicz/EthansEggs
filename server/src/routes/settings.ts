@@ -12,22 +12,33 @@ router.get("/", async (_req, res) => {
     update: {},
     create: { id: 1, rateCents: 100 },
   });
-  res.json({ rate: settings.rateCents / 100 });
+  res.json({ rate: settings.rateCents / 100, chickenCount: settings.chickenCount });
 });
 
-const updateSchema = z.object({ rate: z.number().positive() });
+const updateSchema = z.object({
+  rate: z.number().positive().optional(),
+  chickenCount: z.number().int().positive().max(1000).optional(),
+});
 
 router.put("/", requireParent, async (req, res) => {
   const parsed = updateSchema.safeParse(req.body);
   if (!parsed.success) {
-    return res.status(400).json({ error: "Invalid rate" });
+    return res.status(400).json({ error: "Invalid settings" });
   }
+  const { rate, chickenCount } = parsed.data;
   const settings = await prisma.settings.upsert({
     where: { id: 1 },
-    update: { rateCents: Math.round(parsed.data.rate * 100) },
-    create: { id: 1, rateCents: Math.round(parsed.data.rate * 100) },
+    update: {
+      ...(rate !== undefined ? { rateCents: Math.round(rate * 100) } : {}),
+      ...(chickenCount !== undefined ? { chickenCount } : {}),
+    },
+    create: {
+      id: 1,
+      rateCents: rate !== undefined ? Math.round(rate * 100) : 100,
+      chickenCount: chickenCount ?? 30,
+    },
   });
-  res.json({ rate: settings.rateCents / 100 });
+  res.json({ rate: settings.rateCents / 100, chickenCount: settings.chickenCount });
 });
 
 export default router;
