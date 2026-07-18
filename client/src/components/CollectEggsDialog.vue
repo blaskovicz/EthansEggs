@@ -4,6 +4,7 @@ import type { Profile } from "../api/types";
 
 const props = defineProps<{
   siblings: Profile[]; // other kids not yet marked today; empty/omitted for parents
+  maxEggs?: number; // cap eggCount at the household's number of chickens
 }>();
 
 const emit = defineEmits<{
@@ -15,10 +16,21 @@ const step = ref<"count" | "helpers">("count");
 const eggCount = ref<number | null>(null);
 const selectedHelpers = ref<Set<string>>(new Set());
 
-function adjust(delta: number) {
-  const next = (eggCount.value ?? 0) + delta;
-  eggCount.value = Math.max(0, next);
+function clamp(value: number) {
+  const capped = props.maxEggs !== undefined ? Math.min(value, props.maxEggs) : value;
+  return Math.max(0, capped);
 }
+
+function adjust(delta: number) {
+  eggCount.value = clamp((eggCount.value ?? 0) + delta);
+}
+
+const eggCountModel = computed({
+  get: () => eggCount.value,
+  set: (value: number | null) => {
+    eggCount.value = value === null ? null : clamp(value);
+  },
+});
 
 const MAX_VISIBLE_EGGS = 24;
 const eggIcons = computed(() => {
@@ -58,6 +70,7 @@ function finish() {
         <div class="text-4xl">🥚</div>
         <h2 class="mt-2 text-lg font-semibold text-stone-800">How many eggs?</h2>
         <p class="mt-1 text-xs text-stone-400">Totally optional — skip if you're not sure!</p>
+        <p v-if="props.maxEggs !== undefined" class="mt-0.5 text-xs text-stone-300">Up to {{ props.maxEggs }} 🐔</p>
 
         <div class="mt-4 flex items-center justify-center gap-4">
           <button
@@ -68,9 +81,10 @@ function finish() {
             −
           </button>
           <input
-            v-model.number="eggCount"
+            v-model.number="eggCountModel"
             type="number"
             min="0"
+            :max="props.maxEggs"
             placeholder="?"
             class="w-20 rounded-lg border border-stone-300 py-2 text-center text-2xl font-semibold focus:border-amber-500 focus:outline-none"
           />

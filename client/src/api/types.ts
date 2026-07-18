@@ -60,3 +60,8 @@ export interface ParentSummary {
   color: string;
   collectionsCount: number;
 }
+
+export interface AppSettings {
+  rate: number;
+  chickenCount: number;
+}

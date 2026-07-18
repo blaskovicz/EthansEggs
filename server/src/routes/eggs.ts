@@ -2,7 +2,7 @@ import { Router } from "express";
 import { z } from "zod";
 import { prisma } from "../db";
 import { requireAuth } from "../middleware/auth";
-import { computeChildBalance, todayLocalDate } from "../lib/balance";
+import { computeChildBalance, getChickenCount, todayLocalDate } from "../lib/balance";
 
 const router = Router();
 router.use(requireAuth);
@@ -30,6 +30,13 @@ router.post("/collect", async (req, res) => {
   }
   const { eggCount, helperIds } = parsed.data;
   const date = todayLocalDate();
+
+  if (eggCount !== undefined) {
+    const chickenCount = await getChickenCount();
+    if (eggCount > chickenCount) {
+      return res.status(400).json({ error: `Egg count can't be more than the ${chickenCount} chickens you have` });
+    }
+  }
 
   const alreadyMarked = await prisma.eggCollection.findFirst({
     where: { date },
@@ -74,10 +81,19 @@ router.post("/collect", async (req, res) => {
   res.status(201).json({ entry, helperEntries });
 });
 
-// Undo today's mark (fixes accidental double-taps), self only.
+// Undo today's mark (fixes accidental double-taps), self only. If this user was the one
+// who started today's collection (isHelper: false), also remove any helper entries they
+// marked in the same request - otherwise those rows would be left with no initiator.
 router.delete("/collect/today", async (req, res) => {
   const date = todayLocalDate();
-  await prisma.eggCollection.deleteMany({ where: { userId: req.user!.userId, date } });
+  const myEntry = await prisma.eggCollection.findUnique({
+    where: { userId_date: { userId: req.user!.userId, date } },
+  });
+  if (myEntry && !myEntry.isHelper) {
+    await prisma.eggCollection.deleteMany({ where: { date } });
+  } else {
+    await prisma.eggCollection.deleteMany({ where: { userId: req.user!.userId, date } });
+  }
   res.json({ ok: true });
 });
 

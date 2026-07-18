@@ -52,9 +52,10 @@ model Payment {
   createdAt       DateTime @default(now())
 }
 
-// Single-row app-wide configuration (currently just the per-collection rate).
+// Single-row app-wide configuration (currently just the per-collection rate and coop size).
 model Settings {
   id            Int    @id @default(1)
   rateCents     Int    @default(100)
+  chickenCount  Int    @default(30)
   updatedAt     DateTime @updatedAt
 }

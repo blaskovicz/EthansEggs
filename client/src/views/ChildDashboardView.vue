@@ -7,7 +7,7 @@ import TodayStatusCard from "../components/TodayStatusCard.vue";
 import CollectEggsDialog from "../components/CollectEggsDialog.vue";
 import { http } from "../api/http";
 import { useAuthStore } from "../stores/auth";
-import type { ChildOverview, PaymentEntry, Profile, TodayEntry } from "../api/types";
+import type { AppSettings, ChildOverview, PaymentEntry, Profile, TodayEntry } from "../api/types";
 
 const auth = useAuthStore();
 const overview = ref<ChildOverview | null>(null);
@@ -18,18 +18,21 @@ const marking = ref(false);
 const markError = ref("");
 const showDialog = ref(false);
 const todayStatus = ref<InstanceType<typeof TodayStatusCard> | null>(null);
+const chickenCount = ref<number>(30);
 
 async function load() {
-  const [overviewRes, paymentsRes, profilesRes, todayRes] = await Promise.all([
+  const [overviewRes, paymentsRes, profilesRes, todayRes, settingsRes] = await Promise.all([
     http.get<ChildOverview>("/eggs/mine"),
     http.get<PaymentEntry[]>(`/payments/user/${auth.user!.id}`),
     http.get<Profile[]>("/auth/profiles"),
     http.get<TodayEntry[]>("/eggs/today"),
+    http.get<AppSettings>("/settings"),
   ]);
   overview.value = overviewRes.data;
   payments.value = paymentsRes.data;
   profiles.value = profilesRes.data;
   todayEntries.value = todayRes.data;
+  chickenCount.value = settingsRes.data.chickenCount;
 }
 
 onMounted(load);
@@ -132,6 +135,7 @@ async function undoToday() {
     <CollectEggsDialog
       v-if="showDialog"
       :siblings="availableSiblings"
+      :max-eggs="chickenCount"
       @submit="submitCollection"
       @cancel="showDialog = false"
     />
