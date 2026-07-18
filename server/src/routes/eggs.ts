@@ -2,7 +2,7 @@ import { Router } from "express";
 import { z } from "zod";
 import { prisma } from "../db";
 import { requireAuth } from "../middleware/auth";
-import { computeChildBalance, getChickenCount, todayLocalDate } from "../lib/balance";
+import { computeChildBalance, getChickenCount, getRateCents, todayLocalDate } from "../lib/balance";
 
 const router = Router();
 router.use(requireAuth);
@@ -48,10 +48,14 @@ router.post("/collect", async (req, res) => {
     return res.status(403).json({ error: `${who} already marked eggs collected today` });
   }
 
+  // Snapshot the rate at the moment of collection, so a rate change later doesn't
+  // retroactively reprice this (or anyone else's) past collections.
+  const rateCents = await getRateCents();
+
   let entry;
   try {
     entry = await prisma.eggCollection.create({
-      data: { userId: req.user!.userId, date, eggCount, isHelper: false },
+      data: { userId: req.user!.userId, date, eggCount, isHelper: false, rateCents },
     });
   } catch (e: any) {
     if (e.code === "P2002") {
@@ -69,7 +73,7 @@ router.post("/collect", async (req, res) => {
     for (const helper of helpers) {
       try {
         const helperEntry = await prisma.eggCollection.create({
-          data: { userId: helper.id, date, eggCount, isHelper: true },
+          data: { userId: helper.id, date, eggCount, isHelper: true, rateCents },
         });
         helperEntries.push(helperEntry);
       } catch (e: any) {

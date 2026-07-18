@@ -22,14 +22,21 @@ export interface ChildBalance {
 }
 
 export async function computeChildBalance(userId: string): Promise<ChildBalance> {
-  const [user, collectionsCount, payments, rateCents] = await Promise.all([
+  const [user, collectionsAgg, payments, rateCents] = await Promise.all([
     prisma.user.findUniqueOrThrow({ where: { id: userId } }),
-    prisma.eggCollection.count({ where: { userId } }),
+    // Sum each collection's own snapshotted rate rather than count * current rate,
+    // so a later rate change doesn't retroactively reprice past collections.
+    prisma.eggCollection.aggregate({
+      where: { userId },
+      _count: { _all: true },
+      _sum: { rateCents: true },
+    }),
     prisma.payment.aggregate({ where: { childId: userId }, _sum: { amountCents: true } }),
     getRateCents(),
   ]);
 
-  const totalOwedCents = collectionsCount * rateCents;
+  const collectionsCount = collectionsAgg._count._all;
+  const totalOwedCents = collectionsAgg._sum.rateCents ?? 0;
   const totalPaidCents = payments._sum.amountCents ?? 0;
 
   return {

@@ -127,7 +127,6 @@ async function undoToday() {
         <TransactionList
           :entries="overview.entries"
           :payments="payments"
-          :rate-cents="overview.balance.rateCents"
         />
       </div>
     </main>

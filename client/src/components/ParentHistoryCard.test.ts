@@ -34,6 +34,7 @@ const overview: ChildOverview = {
       date: "2026-07-18",
       eggCount: 2,
       isHelper: false,
+      rateCents: 100,
       note: null,
       createdAt: "2026-07-18T09:00:00",
     },

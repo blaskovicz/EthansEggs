@@ -10,6 +10,7 @@ function entry(overrides: Partial<EggCollectionEntry> = {}): EggCollectionEntry 
     date: "2026-07-18",
     eggCount: null,
     isHelper: false,
+    rateCents: 100,
     note: null,
     createdAt: "2026-07-18T12:00:00",
     ...overrides,

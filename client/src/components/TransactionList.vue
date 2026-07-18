@@ -6,7 +6,6 @@ import type { EggCollectionEntry, PaymentEntry } from "../api/types";
 const props = defineProps<{
   entries: EggCollectionEntry[];
   payments: PaymentEntry[];
-  rateCents: number;
 }>();
 
 type TimelineItem =
@@ -22,7 +21,7 @@ const timeline = computed<TimelineItem[]>(() => {
       id: e.id,
       when: e.createdAt,
       label: `${verb} — ${formatDate(e.date)}${eggs}`,
-      amountCents: props.rateCents,
+      amountCents: e.rateCents,
       icon: e.isHelper ? "🙌" : "🥚",
     };
   });

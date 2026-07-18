@@ -10,6 +10,7 @@ function collection(overrides: Partial<EggCollectionEntry> = {}): EggCollectionE
     date: "2026-07-18",
     eggCount: null,
     isHelper: false,
+    rateCents: 100,
     note: null,
     createdAt: "2026-07-18T09:00:00",
     ...overrides,
@@ -35,7 +36,6 @@ describe("TransactionList", () => {
       props: {
         entries: [collection({ createdAt: "2026-07-17T09:00:00" })],
         payments: [payment({ createdAt: "2026-07-18T09:00:00" })],
-        rateCents: 100,
       },
     });
     const text = wrapper.text();
@@ -45,7 +45,7 @@ describe("TransactionList", () => {
 
   it("shows the helper icon and label for helper entries", () => {
     const wrapper = mount(TransactionList, {
-      props: { entries: [collection({ isHelper: true })], payments: [], rateCents: 100 },
+      props: { entries: [collection({ isHelper: true })], payments: [] },
     });
     expect(wrapper.text()).toContain("🙌");
     expect(wrapper.text()).toContain("Helped collect eggs");
@@ -53,15 +53,30 @@ describe("TransactionList", () => {
 
   it("shows a note-based label for payments with a note", () => {
     const wrapper = mount(TransactionList, {
-      props: { entries: [], payments: [payment({ note: "allowance" })], rateCents: 100 },
+      props: { entries: [], payments: [payment({ note: "allowance" })] },
     });
     expect(wrapper.text()).toContain("Paid: allowance (Zach)");
   });
 
   it("falls back to a generic payment label without a note", () => {
     const wrapper = mount(TransactionList, {
-      props: { entries: [], payments: [payment({ note: null })], rateCents: 100 },
+      props: { entries: [], payments: [payment({ note: null })] },
     });
     expect(wrapper.text()).toContain("Payment from Zach");
+  });
+
+  it("shows each entry's own snapshotted rate, not a single current rate", () => {
+    const wrapper = mount(TransactionList, {
+      props: {
+        entries: [
+          collection({ id: "old", date: "2026-07-01", rateCents: 100, createdAt: "2026-07-01T09:00:00" }),
+          collection({ id: "new", date: "2026-07-18", rateCents: 50, createdAt: "2026-07-18T09:00:00" }),
+        ],
+        payments: [],
+      },
+    });
+    const text = wrapper.text();
+    expect(text).toContain("+$1.00");
+    expect(text).toContain("+$0.50");
   });
 });

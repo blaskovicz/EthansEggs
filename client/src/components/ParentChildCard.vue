@@ -124,7 +124,6 @@ async function recordPayment() {
         v-else-if="overview"
         :entries="overview.entries"
         :payments="payments"
-        :rate-cents="balance.rateCents"
       />
     </div>
   </div>

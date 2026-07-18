@@ -45,16 +45,16 @@ describe("computeChildBalance", () => {
     });
   });
 
-  it("owes rateCents per collection, minus payments made", async () => {
+  it("owes each collection's own snapshotted rate, minus payments made", async () => {
     const child = await createUser({ name: "Ethan", role: "CHILD" });
     const parent = await createUser({ name: "Zach", role: "PARENT" });
     await prisma.settings.create({ data: { id: 1, rateCents: 150 } });
 
     await prisma.eggCollection.createMany({
       data: [
-        { userId: child.id, date: "2026-07-16" },
-        { userId: child.id, date: "2026-07-17" },
-        { userId: child.id, date: "2026-07-18" },
+        { userId: child.id, date: "2026-07-16", rateCents: 150 },
+        { userId: child.id, date: "2026-07-17", rateCents: 150 },
+        { userId: child.id, date: "2026-07-18", rateCents: 150 },
       ],
     });
     await prisma.payment.create({
@@ -71,11 +71,31 @@ describe("computeChildBalance", () => {
   it("counts collections marked as helper the same as a direct collection", async () => {
     const child = await createUser({ name: "Benedict", role: "CHILD" });
     await prisma.eggCollection.create({
-      data: { userId: child.id, date: "2026-07-18", isHelper: true },
+      data: { userId: child.id, date: "2026-07-18", isHelper: true, rateCents: 100 },
     });
     const balance = await computeChildBalance(child.id);
     expect(balance.collectionsCount).toBe(1);
     expect(balance.totalOwedCents).toBe(100);
+  });
+
+  it("does not retroactively reprice past collections when the rate changes later", async () => {
+    const child = await createUser({ name: "Ethan", role: "CHILD" });
+    await prisma.settings.create({ data: { id: 1, rateCents: 100 } });
+
+    // Collected back when the rate was $1.00.
+    await prisma.eggCollection.create({
+      data: { userId: child.id, date: "2026-07-10", rateCents: 100 },
+    });
+
+    // Parent drops the rate to $0.50 - shouldn't touch the earlier collection.
+    await prisma.settings.update({ where: { id: 1 }, data: { rateCents: 50 } });
+    await prisma.eggCollection.create({
+      data: { userId: child.id, date: "2026-07-18", rateCents: 50 },
+    });
+
+    const balance = await computeChildBalance(child.id);
+    expect(balance.collectionsCount).toBe(2);
+    expect(balance.totalOwedCents).toBe(150); // 100 (old rate) + 50 (new rate), not 2 * 50
   });
 
   it("throws when the user does not exist", async () => {

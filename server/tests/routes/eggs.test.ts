@@ -96,6 +96,20 @@ describe("POST /api/eggs/collect", () => {
       .send({ eggCount: -5 });
     expect(res.status).toBe(400);
   });
+
+  it("snapshots the rate at collection time onto the entry", async () => {
+    const child = await createUser({ name: "Ethan", role: "CHILD" });
+    const parent = await createUser({ name: "Zach", role: "PARENT" });
+
+    const res = await request(app).post("/api/eggs/collect").set("Cookie", cookieForUser(child)).send({});
+    expect(res.body.entry.rateCents).toBe(100);
+
+    // Rate change after the fact shouldn't touch the entry that was already created.
+    await request(app).put("/api/settings").set("Cookie", cookieForUser(parent)).send({ rate: 0.5 });
+    const mine = await request(app).get("/api/eggs/mine").set("Cookie", cookieForUser(child));
+    expect(mine.body.entries[0].rateCents).toBe(100);
+    expect(mine.body.balance.totalOwedCents).toBe(100);
+  });
 });
 
 describe("DELETE /api/eggs/collect/today", () => {

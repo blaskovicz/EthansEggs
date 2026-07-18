@@ -13,6 +13,7 @@ export interface EggCollectionEntry {
   date: string;
   eggCount: number | null;
   isHelper: boolean;
+  rateCents: number;
   note: string | null;
   createdAt: string;
 }
