@@ -6,3 +6,7 @@ dist
 # SQLite database - contains real household data, not source
 server/prisma/dev.db
 server/prisma/dev.db-journal
+
+# Test database - recreated fresh on every test run
+server/prisma/test.db
+server/prisma/test.db-journal

@@ -11,25 +11,67 @@ function canView(req: any, targetUserId: string) {
   return req.user.role === "PARENT" || req.user.userId === targetUserId;
 }
 
-// Mark that the logged-in child collected/helped collect eggs today.
-router.post("/collect", async (req, res) => {
-  if (req.user!.role !== "CHILD") {
-    return res.status(403).json({ error: "Only children mark egg collection" });
-  }
-  const date = todayLocalDate();
-  const note = z.string().max(280).optional().safeParse(req.body?.note).data;
+const collectSchema = z.object({
+  eggCount: z.number().int().positive().max(500).optional(),
+  helperIds: z.array(z.string().min(1)).max(20).optional(),
+});
 
+// Mark that the logged-in user (child or parent) collected/helped collect eggs today.
+// Only one person can *start* today's collection - whoever gets there first (a child,
+// who may name helpers in the same request, or a parent) locks it for everyone else
+// for the rest of the day. This keeps "today's collection" a single coordinated event
+// instead of multiple people independently claiming the same day. Parent-recorded
+// entries don't generate any payout (parents aren't paid) - they exist purely so the
+// household can see the chore is done.
+router.post("/collect", async (req, res) => {
+  const parsed = collectSchema.safeParse(req.body ?? {});
+  if (!parsed.success) {
+    return res.status(400).json({ error: parsed.error.issues[0]?.message ?? "Invalid input" });
+  }
+  const { eggCount, helperIds } = parsed.data;
+  const date = todayLocalDate();
+
+  const alreadyMarked = await prisma.eggCollection.findFirst({
+    where: { date },
+    include: { user: { select: { name: true, role: true } } },
+  });
+  if (alreadyMarked) {
+    const who =
+      alreadyMarked.user.role === "PARENT" ? `${alreadyMarked.user.name} (a parent)` : alreadyMarked.user.name;
+    return res.status(403).json({ error: `${who} already marked eggs collected today` });
+  }
+
+  let entry;
   try {
-    const entry = await prisma.eggCollection.create({
-      data: { userId: req.user!.userId, date, note: note || undefined },
+    entry = await prisma.eggCollection.create({
+      data: { userId: req.user!.userId, date, eggCount, isHelper: false },
     });
-    res.status(201).json(entry);
   } catch (e: any) {
     if (e.code === "P2002") {
       return res.status(409).json({ error: "Already marked for today" });
     }
     throw e;
   }
+
+  const helperEntries = [];
+  if (req.user!.role === "CHILD" && helperIds?.length) {
+    const helperIdSet = [...new Set(helperIds)].filter((id) => id !== req.user!.userId);
+    const helpers = await prisma.user.findMany({
+      where: { id: { in: helperIdSet }, role: "CHILD" },
+    });
+    for (const helper of helpers) {
+      try {
+        const helperEntry = await prisma.eggCollection.create({
+          data: { userId: helper.id, date, eggCount, isHelper: true },
+        });
+        helperEntries.push(helperEntry);
+      } catch (e: any) {
+        if (e.code !== "P2002") throw e; // already marked today - skip silently
+      }
+    }
+  }
+
+  res.status(201).json({ entry, helperEntries });
 });
 
 // Undo today's mark (fixes accidental double-taps), self only.
@@ -37,6 +79,19 @@ router.delete("/collect/today", async (req, res) => {
   const date = todayLocalDate();
   await prisma.eggCollection.deleteMany({ where: { userId: req.user!.userId, date } });
   res.json({ ok: true });
+});
+
+// Visible to any logged-in user: who has (or hasn't) collected/helped today, and how
+// many eggs, so the whole household can coordinate without needing to log in as
+// a specific person.
+router.get("/today", async (_req, res) => {
+  const date = todayLocalDate();
+  const entries = await prisma.eggCollection.findMany({
+    where: { date },
+    orderBy: { createdAt: "asc" },
+    include: { user: { select: { name: true, role: true, color: true } } },
+  });
+  res.json(entries);
 });
 
 router.get("/mine", async (req, res) => {

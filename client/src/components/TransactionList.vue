@@ -10,23 +10,29 @@ const props = defineProps<{
 }>();
 
 type TimelineItem =
-  | { kind: "collection"; id: string; when: string; label: string; amountCents: number }
-  | { kind: "payment"; id: string; when: string; label: string; amountCents: number };
+  | { kind: "collection"; id: string; when: string; label: string; amountCents: number; icon: string }
+  | { kind: "payment"; id: string; when: string; label: string; amountCents: number; icon: string };
 
 const timeline = computed<TimelineItem[]>(() => {
-  const collections: TimelineItem[] = props.entries.map((e) => ({
-    kind: "collection",
-    id: e.id,
-    when: e.createdAt,
-    label: `Collected eggs — ${formatDate(e.date)}`,
-    amountCents: props.rateCents,
-  }));
+  const collections: TimelineItem[] = props.entries.map((e) => {
+    const verb = e.isHelper ? "Helped collect eggs" : "Collected eggs";
+    const eggs = e.eggCount != null ? ` (${e.eggCount} egg${e.eggCount === 1 ? "" : "s"})` : "";
+    return {
+      kind: "collection",
+      id: e.id,
+      when: e.createdAt,
+      label: `${verb} — ${formatDate(e.date)}${eggs}`,
+      amountCents: props.rateCents,
+      icon: e.isHelper ? "🙌" : "🥚",
+    };
+  });
   const payments: TimelineItem[] = props.payments.map((p) => ({
     kind: "payment",
     id: p.id,
     when: p.createdAt,
     label: p.note ? `Paid: ${p.note} (${p.recordedBy.name})` : `Payment from ${p.recordedBy.name}`,
     amountCents: -p.amountCents,
+    icon: "💵",
   }));
   return [...collections, ...payments].sort((a, b) => (a.when < b.when ? 1 : -1));
 });
@@ -47,7 +53,7 @@ const timeline = computed<TimelineItem[]>(() => {
           class="flex h-8 w-8 items-center justify-center rounded-full text-sm"
           :class="item.kind === 'collection' ? 'bg-amber-100' : 'bg-emerald-100'"
         >
-          {{ item.kind === "collection" ? "🥚" : "💵" }}
+          {{ item.icon }}
         </span>
         <div>
           <p class="text-sm font-medium text-stone-700">{{ item.label }}</p>

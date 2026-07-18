@@ -32,6 +32,8 @@ model EggCollection {
   userId      String
   user        User     @relation("CollectorUser", fields: [userId], references: [id])
   date        String // YYYY-MM-DD, local calendar day
+  eggCount    Int? // optional count the collector chose to report
+  isHelper    Boolean  @default(false) // true if auto-marked as helping someone else's entry
   note        String?
   createdAt   DateTime @default(now())
 

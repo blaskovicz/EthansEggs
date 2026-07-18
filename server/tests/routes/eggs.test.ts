@@ -1,0 +1,167 @@
+import { beforeEach, describe, expect, it } from "vitest";
+import request from "supertest";
+import { createApp } from "../../src/app";
+import { createUser, cookieForUser, resetDb } from "../helpers";
+
+const app = createApp();
+
+beforeEach(async () => {
+  await resetDb();
+});
+
+describe("POST /api/eggs/collect", () => {
+  it("401s without auth", async () => {
+    const res = await request(app).post("/api/eggs/collect").send({});
+    expect(res.status).toBe(401);
+  });
+
+  it("creates today's entry for the logged-in child", async () => {
+    const child = await createUser({ name: "Ethan", role: "CHILD" });
+    const res = await request(app)
+      .post("/api/eggs/collect")
+      .set("Cookie", cookieForUser(child))
+      .send({ eggCount: 5 });
+
+    expect(res.status).toBe(201);
+    expect(res.body.entry).toMatchObject({ userId: child.id, eggCount: 5, isHelper: false });
+    expect(res.body.helperEntries).toEqual([]);
+  });
+
+  it("also creates entries for named helpers", async () => {
+    const child = await createUser({ name: "Ethan", role: "CHILD" });
+    const helper = await createUser({ name: "Benedict", role: "CHILD" });
+
+    const res = await request(app)
+      .post("/api/eggs/collect")
+      .set("Cookie", cookieForUser(child))
+      .send({ eggCount: 3, helperIds: [helper.id] });
+
+    expect(res.status).toBe(201);
+    expect(res.body.helperEntries).toHaveLength(1);
+    expect(res.body.helperEntries[0]).toMatchObject({ userId: helper.id, eggCount: 3, isHelper: true });
+  });
+
+  it("ignores a helperId equal to the requester's own id", async () => {
+    const child = await createUser({ name: "Ethan", role: "CHILD" });
+    const res = await request(app)
+      .post("/api/eggs/collect")
+      .set("Cookie", cookieForUser(child))
+      .send({ helperIds: [child.id] });
+
+    expect(res.status).toBe(201);
+    expect(res.body.helperEntries).toEqual([]);
+  });
+
+  it("rejects a second collection attempt for the same day from anyone", async () => {
+    const child = await createUser({ name: "Ethan", role: "CHILD" });
+    const other = await createUser({ name: "Benedict", role: "CHILD" });
+
+    const first = await request(app).post("/api/eggs/collect").set("Cookie", cookieForUser(child)).send({});
+    expect(first.status).toBe(201);
+
+    const second = await request(app).post("/api/eggs/collect").set("Cookie", cookieForUser(other)).send({});
+    expect(second.status).toBe(403);
+    expect(second.body.error).toMatch(/Ethan/);
+  });
+
+  it("labels a parent's entry distinctly in the conflict message", async () => {
+    const parent = await createUser({ name: "Zach", role: "PARENT" });
+    const child = await createUser({ name: "Ethan", role: "CHILD" });
+
+    await request(app).post("/api/eggs/collect").set("Cookie", cookieForUser(parent)).send({});
+    const res = await request(app).post("/api/eggs/collect").set("Cookie", cookieForUser(child)).send({});
+
+    expect(res.status).toBe(403);
+    expect(res.body.error).toMatch(/Zach \(a parent\)/);
+  });
+
+  it("does not let a parent name helpers", async () => {
+    const parent = await createUser({ name: "Zach", role: "PARENT" });
+    const child = await createUser({ name: "Ethan", role: "CHILD" });
+
+    const res = await request(app)
+      .post("/api/eggs/collect")
+      .set("Cookie", cookieForUser(parent))
+      .send({ helperIds: [child.id] });
+
+    expect(res.status).toBe(201);
+    expect(res.body.helperEntries).toEqual([]);
+  });
+
+  it("rejects an invalid eggCount", async () => {
+    const child = await createUser({ name: "Ethan", role: "CHILD" });
+    const res = await request(app)
+      .post("/api/eggs/collect")
+      .set("Cookie", cookieForUser(child))
+      .send({ eggCount: -5 });
+    expect(res.status).toBe(400);
+  });
+});
+
+describe("DELETE /api/eggs/collect/today", () => {
+  it("removes only the caller's own entry for today", async () => {
+    const child = await createUser({ name: "Ethan", role: "CHILD" });
+    await request(app).post("/api/eggs/collect").set("Cookie", cookieForUser(child)).send({});
+
+    const del = await request(app).delete("/api/eggs/collect/today").set("Cookie", cookieForUser(child));
+    expect(del.status).toBe(200);
+
+    const mine = await request(app).get("/api/eggs/mine").set("Cookie", cookieForUser(child));
+    expect(mine.body.entries).toEqual([]);
+    expect(mine.body.markedToday).toBe(false);
+  });
+});
+
+describe("GET /api/eggs/today", () => {
+  it("shows entries from everyone, including collector name/role/color", async () => {
+    const child = await createUser({ name: "Ethan", role: "CHILD", color: "#f59e0b" });
+    await request(app).post("/api/eggs/collect").set("Cookie", cookieForUser(child)).send({ eggCount: 4 });
+
+    const res = await request(app).get("/api/eggs/today").set("Cookie", cookieForUser(child));
+    expect(res.status).toBe(200);
+    expect(res.body).toHaveLength(1);
+    expect(res.body[0]).toMatchObject({
+      eggCount: 4,
+      user: { name: "Ethan", role: "CHILD", color: "#f59e0b" },
+    });
+  });
+});
+
+describe("GET /api/eggs/mine", () => {
+  it("returns balance, entries, and markedToday for the caller", async () => {
+    const child = await createUser({ name: "Ethan", role: "CHILD" });
+    await request(app).post("/api/eggs/collect").set("Cookie", cookieForUser(child)).send({});
+
+    const res = await request(app).get("/api/eggs/mine").set("Cookie", cookieForUser(child));
+    expect(res.status).toBe(200);
+    expect(res.body.markedToday).toBe(true);
+    expect(res.body.entries).toHaveLength(1);
+    expect(res.body.balance.collectionsCount).toBe(1);
+  });
+});
+
+describe("GET /api/eggs/user/:id", () => {
+  it("lets a parent view any child's history", async () => {
+    const parent = await createUser({ name: "Zach", role: "PARENT" });
+    const child = await createUser({ name: "Ethan", role: "CHILD" });
+    await request(app).post("/api/eggs/collect").set("Cookie", cookieForUser(child)).send({});
+
+    const res = await request(app).get(`/api/eggs/user/${child.id}`).set("Cookie", cookieForUser(parent));
+    expect(res.status).toBe(200);
+    expect(res.body.entries).toHaveLength(1);
+  });
+
+  it("forbids a child from viewing another child's history", async () => {
+    const child = await createUser({ name: "Ethan", role: "CHILD" });
+    const sibling = await createUser({ name: "Benedict", role: "CHILD" });
+
+    const res = await request(app).get(`/api/eggs/user/${sibling.id}`).set("Cookie", cookieForUser(child));
+    expect(res.status).toBe(403);
+  });
+
+  it("lets a child view their own history", async () => {
+    const child = await createUser({ name: "Ethan", role: "CHILD" });
+    const res = await request(app).get(`/api/eggs/user/${child.id}`).set("Cookie", cookieForUser(child));
+    expect(res.status).toBe(200);
+  });
+});

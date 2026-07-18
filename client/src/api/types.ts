@@ -11,8 +11,20 @@ export interface EggCollectionEntry {
   id: string;
   userId: string;
   date: string;
+  eggCount: number | null;
+  isHelper: boolean;
   note: string | null;
   createdAt: string;
+}
+
+export interface TodayEntry {
+  id: string;
+  userId: string;
+  date: string;
+  eggCount: number | null;
+  isHelper: boolean;
+  createdAt: string;
+  user: { name: string; role: Role; color: string };
 }
 
 export interface ChildBalance {

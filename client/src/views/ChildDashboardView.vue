@@ -1,35 +1,66 @@
 <script setup lang="ts">
-import { onMounted, ref } from "vue";
+import { computed, onMounted, ref } from "vue";
 import AppHeader from "../components/AppHeader.vue";
 import BalanceCard from "../components/BalanceCard.vue";
 import TransactionList from "../components/TransactionList.vue";
+import TodayStatusCard from "../components/TodayStatusCard.vue";
+import CollectEggsDialog from "../components/CollectEggsDialog.vue";
 import { http } from "../api/http";
 import { useAuthStore } from "../stores/auth";
-import type { ChildOverview, PaymentEntry } from "../api/types";
+import type { ChildOverview, PaymentEntry, Profile, TodayEntry } from "../api/types";
 
 const auth = useAuthStore();
 const overview = ref<ChildOverview | null>(null);
 const payments = ref<PaymentEntry[]>([]);
+const profiles = ref<Profile[]>([]);
+const todayEntries = ref<TodayEntry[]>([]);
 const marking = ref(false);
 const markError = ref("");
+const showDialog = ref(false);
+const todayStatus = ref<InstanceType<typeof TodayStatusCard> | null>(null);
 
 async function load() {
-  const [overviewRes, paymentsRes] = await Promise.all([
+  const [overviewRes, paymentsRes, profilesRes, todayRes] = await Promise.all([
     http.get<ChildOverview>("/eggs/mine"),
     http.get<PaymentEntry[]>(`/payments/user/${auth.user!.id}`),
+    http.get<Profile[]>("/auth/profiles"),
+    http.get<TodayEntry[]>("/eggs/today"),
   ]);
   overview.value = overviewRes.data;
   payments.value = paymentsRes.data;
+  profiles.value = profilesRes.data;
+  todayEntries.value = todayRes.data;
 }
 
 onMounted(load);
 
-async function markCollected() {
+// Once anyone (a sibling or a parent) has logged today, the day is locked for everyone
+// else - only one person starts today's collection, naming helpers along the way.
+const blockedByOther = computed(() => todayEntries.value.length > 0 && !overview.value?.markedToday);
+
+const blockedMessage = computed(() => {
+  const first = todayEntries.value[0];
+  if (!first) return "";
+  return first.user.role === "PARENT"
+    ? `🏡 ${first.user.name} already logged today's collection.`
+    : `🥚 ${first.user.name} already marked today's collection.`;
+});
+
+const availableSiblings = computed<Profile[]>(() => {
+  const markedIds = new Set(todayEntries.value.map((e) => e.userId));
+  return profiles.value.filter(
+    (p) => p.role === "CHILD" && p.id !== auth.user?.id && !markedIds.has(p.id)
+  );
+});
+
+async function submitCollection(payload: { eggCount?: number; helperIds?: string[] }) {
+  showDialog.value = false;
   marking.value = true;
   markError.value = "";
   try {
-    await http.post("/eggs/collect");
+    await http.post("/eggs/collect", payload);
     await load();
+    await todayStatus.value?.reload();
   } catch (e: any) {
     markError.value = e.message;
   } finally {
@@ -42,6 +73,7 @@ async function undoToday() {
   try {
     await http.delete("/eggs/collect/today");
     await load();
+    await todayStatus.value?.reload();
   } finally {
     marking.value = false;
   }
@@ -67,18 +99,23 @@ async function undoToday() {
           :disabled="marking"
           @click="undoToday"
         >
-          Undo
+          Actually, I really didn't...
         </button>
+        <template v-else-if="blockedByOther">
+          <p class="text-sm text-stone-500">{{ blockedMessage }}</p>
+        </template>
         <button
           v-else
           class="w-full rounded-xl bg-amber-500 py-3 text-base font-semibold text-white shadow-sm transition hover:bg-amber-600 disabled:opacity-50"
           :disabled="marking"
-          @click="markCollected"
+          @click="showDialog = true"
         >
           🥚 I collected eggs today!
         </button>
         <p v-if="markError" class="mt-2 text-sm text-red-600">{{ markError }}</p>
       </div>
+
+      <TodayStatusCard ref="todayStatus" />
 
       <BalanceCard :balance="overview.balance" />
 
@@ -91,5 +128,12 @@ async function undoToday() {
         />
       </div>
     </main>
+
+    <CollectEggsDialog
+      v-if="showDialog"
+      :siblings="availableSiblings"
+      @submit="submitCollection"
+      @cancel="showDialog = false"
+    />
   </div>
 </template>
