@@ -13,4 +13,18 @@ router.get("/children", async (_req, res) => {
   res.json(balances);
 });
 
+// Every parent with their collection count (no money involved - parents aren't paid).
+router.get("/parents", async (_req, res) => {
+  const parents = await prisma.user.findMany({ where: { role: "PARENT" }, orderBy: { name: "asc" } });
+  const withCounts = await Promise.all(
+    parents.map(async (p) => ({
+      userId: p.id,
+      name: p.name,
+      color: p.color,
+      collectionsCount: await prisma.eggCollection.count({ where: { userId: p.id } }),
+    }))
+  );
+  res.json(withCounts);
+});
+
 export default router;
