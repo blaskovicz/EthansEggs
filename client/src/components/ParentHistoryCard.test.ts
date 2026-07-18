@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { flushPromises, mount } from "@vue/test-utils";
 import { http } from "../api/http";
 import ParentHistoryCard from "./ParentHistoryCard.vue";
-import type { ChildOverview, Profile } from "../api/types";
+import type { ChildOverview, ParentSummary } from "../api/types";
 
 vi.mock("../api/http", () => ({
   http: { get: vi.fn() },
@@ -14,13 +14,13 @@ beforeEach(() => {
   mockedHttp.get.mockReset();
 });
 
-const profile: Profile = { id: "u1", name: "Ethan", role: "CHILD", color: "#f59e0b" };
+const parent: ParentSummary = { userId: "u1", name: "Zach", color: "#0ea5e9", collectionsCount: 1 };
 
 const overview: ChildOverview = {
   balance: {
     userId: "u1",
-    name: "Ethan",
-    color: "#f59e0b",
+    name: "Zach",
+    color: "#0ea5e9",
     collectionsCount: 1,
     rateCents: 100,
     totalOwedCents: 100,
@@ -42,14 +42,14 @@ const overview: ChildOverview = {
 };
 
 describe("ParentHistoryCard", () => {
-  it("does not fetch the child's history until expanded", () => {
-    mount(ParentHistoryCard, { props: { profile } });
+  it("does not fetch history until expanded", () => {
+    mount(ParentHistoryCard, { props: { parent, isSelf: false } });
     expect(mockedHttp.get).not.toHaveBeenCalled();
   });
 
   it("fetches and displays history on first expand", async () => {
     mockedHttp.get.mockResolvedValueOnce({ data: overview });
-    const wrapper = mount(ParentHistoryCard, { props: { profile } });
+    const wrapper = mount(ParentHistoryCard, { props: { parent, isSelf: false } });
 
     await wrapper.find("button").trigger("click");
     await flushPromises();
@@ -60,7 +60,7 @@ describe("ParentHistoryCard", () => {
 
   it("does not refetch on subsequent expand/collapse toggles", async () => {
     mockedHttp.get.mockResolvedValueOnce({ data: overview });
-    const wrapper = mount(ParentHistoryCard, { props: { profile } });
+    const wrapper = mount(ParentHistoryCard, { props: { parent, isSelf: false } });
     const toggle = wrapper.find("button");
 
     await toggle.trigger("click");
@@ -70,5 +70,10 @@ describe("ParentHistoryCard", () => {
     await flushPromises();
 
     expect(mockedHttp.get).toHaveBeenCalledTimes(1);
+  });
+
+  it("labels the current user as (you)", () => {
+    const wrapper = mount(ParentHistoryCard, { props: { parent, isSelf: true } });
+    expect(wrapper.text()).toContain("Zach (you)");
   });
 });

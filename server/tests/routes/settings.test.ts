@@ -15,11 +15,11 @@ describe("GET /api/settings", () => {
     expect(res.status).toBe(401);
   });
 
-  it("creates and returns the default rate on first access", async () => {
+  it("creates and returns the default rate and chicken count on first access", async () => {
     const user = await createUser({ name: "Ethan", role: "CHILD" });
     const res = await request(app).get("/api/settings").set("Cookie", cookieForUser(user));
     expect(res.status).toBe(200);
-    expect(res.body).toEqual({ rate: 1 });
+    expect(res.body).toEqual({ rate: 1, chickenCount: 30 });
   });
 });
 
@@ -34,10 +34,20 @@ describe("PUT /api/settings", () => {
     const parent = await createUser({ name: "Zach", role: "PARENT" });
     const res = await request(app).put("/api/settings").set("Cookie", cookieForUser(parent)).send({ rate: 1.5 });
     expect(res.status).toBe(200);
-    expect(res.body).toEqual({ rate: 1.5 });
+    expect(res.body).toEqual({ rate: 1.5, chickenCount: 30 });
 
     const after = await request(app).get("/api/settings").set("Cookie", cookieForUser(parent));
-    expect(after.body).toEqual({ rate: 1.5 });
+    expect(after.body).toEqual({ rate: 1.5, chickenCount: 30 });
+  });
+
+  it("updates the chicken count independently of rate", async () => {
+    const parent = await createUser({ name: "Zach", role: "PARENT" });
+    const res = await request(app)
+      .put("/api/settings")
+      .set("Cookie", cookieForUser(parent))
+      .send({ chickenCount: 12 });
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({ rate: 1, chickenCount: 12 });
   });
 
   it("rejects a non-positive rate", async () => {
