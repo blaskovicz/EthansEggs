@@ -8,6 +8,7 @@ import eggsRoutes from "./routes/eggs";
 import paymentsRoutes from "./routes/payments";
 import settingsRoutes from "./routes/settings";
 import usersRoutes from "./routes/users";
+import prizesRoutes from "./routes/prizes";
 
 export function createApp() {
   const app = express();
@@ -25,6 +26,7 @@ export function createApp() {
   app.use("/api/payments", paymentsRoutes);
   app.use("/api/settings", settingsRoutes);
   app.use("/api/users", usersRoutes);
+  app.use("/api/prizes", prizesRoutes);
 
   // Serve the built Vue SPA in production.
   const clientDist = path.join(__dirname, "..", "..", "client", "dist");

@@ -11,6 +11,7 @@ const balance: ChildBalance = {
   rateCents: 100,
   totalOwedCents: 400,
   totalPaidCents: 150,
+  totalPrizesCents: 0,
   balanceCents: 250,
 };
 
@@ -22,5 +23,11 @@ describe("BalanceCard", () => {
     expect(text).toContain("$4.00");
     expect(text).toContain("$1.50");
     expect(text).toContain("4");
+  });
+
+  it("renders the amount spent on prizes", () => {
+    const wrapper = mount(BalanceCard, { props: { balance: { ...balance, totalPrizesCents: 300 } } });
+    expect(wrapper.text()).toContain("$3.00");
+    expect(wrapper.text()).toContain("prizes");
   });
 });

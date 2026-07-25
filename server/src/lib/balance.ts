@@ -18,11 +18,12 @@ export interface ChildBalance {
   rateCents: number;
   totalOwedCents: number;
   totalPaidCents: number;
+  totalPrizesCents: number;
   balanceCents: number;
 }
 
 export async function computeChildBalance(userId: string): Promise<ChildBalance> {
-  const [user, collectionsAgg, payments, rateCents] = await Promise.all([
+  const [user, collectionsAgg, payments, prizeAwards, rateCents] = await Promise.all([
     prisma.user.findUniqueOrThrow({ where: { id: userId } }),
     // Sum each collection's own snapshotted rate rather than count * current rate,
     // so a later rate change doesn't retroactively reprice past collections.
@@ -32,12 +33,16 @@ export async function computeChildBalance(userId: string): Promise<ChildBalance>
       _sum: { rateCents: true },
     }),
     prisma.payment.aggregate({ where: { childId: userId }, _sum: { amountCents: true } }),
+    // Sum each award's own snapshotted priceCents, so a later catalog price change
+    // (or the prize being deleted) doesn't retroactively reprice past awards.
+    prisma.prizeAward.aggregate({ where: { childId: userId }, _sum: { priceCents: true } }),
     getRateCents(),
   ]);
 
   const collectionsCount = collectionsAgg._count._all;
   const totalOwedCents = collectionsAgg._sum.rateCents ?? 0;
   const totalPaidCents = payments._sum.amountCents ?? 0;
+  const totalPrizesCents = prizeAwards._sum.priceCents ?? 0;
 
   return {
     userId,
@@ -47,7 +52,8 @@ export async function computeChildBalance(userId: string): Promise<ChildBalance>
     rateCents,
     totalOwedCents,
     totalPaidCents,
-    balanceCents: totalOwedCents - totalPaidCents,
+    totalPrizesCents,
+    balanceCents: totalOwedCents - totalPaidCents - totalPrizesCents,
   };
 }
 

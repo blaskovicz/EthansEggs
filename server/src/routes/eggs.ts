@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { z } from "zod";
 import { prisma } from "../db";
-import { requireAuth } from "../middleware/auth";
+import { requireAuth, requireParent } from "../middleware/auth";
 import { computeChildBalance, getChickenCount, getRateCents, todayLocalDate } from "../lib/balance";
 
 const router = Router();
@@ -98,6 +98,94 @@ router.delete("/collect/today", async (req, res) => {
   } else {
     await prisma.eggCollection.deleteMany({ where: { userId: req.user!.userId, date } });
   }
+  res.json({ ok: true });
+});
+
+const dateSchema = z
+  .string()
+  .regex(/^\d{4}-\d{2}-\d{2}$/, "Date must be YYYY-MM-DD");
+
+const manualEntrySchema = z.object({
+  userId: z.string().min(1),
+  date: dateSchema,
+  eggCount: z.number().int().positive().max(500).optional(),
+});
+
+// Parents can retroactively add a collection a child forgot to mark - e.g. logging
+// eggs for a past date that has no entry yet. Unlike POST /collect, this is scoped
+// to one child/date pair and doesn't lock out the rest of the household, since it's
+// a correction to the record rather than coordinating today's chore in real time.
+router.post("/manual", requireParent, async (req, res) => {
+  const parsed = manualEntrySchema.safeParse(req.body ?? {});
+  if (!parsed.success) {
+    return res.status(400).json({ error: parsed.error.issues[0]?.message ?? "Invalid input" });
+  }
+  const { userId, date, eggCount } = parsed.data;
+
+  if (date > todayLocalDate()) {
+    return res.status(400).json({ error: "Date can't be in the future" });
+  }
+
+  const child = await prisma.user.findUnique({ where: { id: userId } });
+  if (!child || child.role !== "CHILD") {
+    return res.status(404).json({ error: "Child not found" });
+  }
+
+  if (eggCount !== undefined) {
+    const chickenCount = await getChickenCount();
+    if (eggCount > chickenCount) {
+      return res.status(400).json({ error: `Egg count can't be more than the ${chickenCount} chickens you have` });
+    }
+  }
+
+  const rateCents = await getRateCents();
+  try {
+    const entry = await prisma.eggCollection.create({
+      data: { userId, date, eggCount, isHelper: false, rateCents },
+    });
+    res.status(201).json(entry);
+  } catch (e: any) {
+    if (e.code === "P2002") {
+      return res.status(409).json({ error: "That day already has an entry - edit it instead" });
+    }
+    throw e;
+  }
+});
+
+const editEntrySchema = z.object({
+  eggCount: z.number().int().min(0).max(500).nullable(),
+});
+
+// Parents can correct the egg count on any existing entry (any date, any user).
+router.patch("/:id", requireParent, async (req, res) => {
+  const parsed = editEntrySchema.safeParse(req.body ?? {});
+  if (!parsed.success) {
+    return res.status(400).json({ error: parsed.error.issues[0]?.message ?? "Invalid input" });
+  }
+
+  const existing = await prisma.eggCollection.findUnique({ where: { id: req.params.id } });
+  if (!existing) {
+    return res.status(404).json({ error: "Entry not found" });
+  }
+
+  if (parsed.data.eggCount !== null) {
+    const chickenCount = await getChickenCount();
+    if (parsed.data.eggCount > chickenCount) {
+      return res.status(400).json({ error: `Egg count can't be more than the ${chickenCount} chickens you have` });
+    }
+  }
+
+  const entry = await prisma.eggCollection.update({
+    where: { id: req.params.id },
+    data: { eggCount: parsed.data.eggCount },
+  });
+  res.json(entry);
+});
+
+// Parents can cancel any collection entry - a correction tool alongside the
+// self-only DELETE /collect/today, not a replacement for it.
+router.delete("/:id", requireParent, async (req, res) => {
+  await prisma.eggCollection.delete({ where: { id: req.params.id } }).catch(() => null);
   res.json({ ok: true });
 });
 

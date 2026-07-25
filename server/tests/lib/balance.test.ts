@@ -101,4 +101,47 @@ describe("computeChildBalance", () => {
   it("throws when the user does not exist", async () => {
     await expect(computeChildBalance("does-not-exist")).rejects.toThrow();
   });
+
+  it("deducts prize awards from the balance", async () => {
+    const child = await createUser({ name: "Ethan", role: "CHILD" });
+    const parent = await createUser({ name: "Zach", role: "PARENT" });
+    await prisma.eggCollection.create({ data: { userId: child.id, date: "2026-07-16", rateCents: 100 } });
+    const prize = await prisma.prize.create({ data: { name: "Ice cream", priceCents: 300, icon: "🍦" } });
+    await prisma.prizeAward.create({
+      data: {
+        childId: child.id,
+        prizeId: prize.id,
+        name: prize.name,
+        priceCents: prize.priceCents,
+        icon: prize.icon,
+        awardedById: parent.id,
+      },
+    });
+
+    const balance = await computeChildBalance(child.id);
+    expect(balance.totalOwedCents).toBe(100);
+    expect(balance.totalPrizesCents).toBe(300);
+    expect(balance.balanceCents).toBe(-200);
+  });
+
+  it("does not retroactively reprice a past award when the catalog prize's price changes (or is deleted)", async () => {
+    const child = await createUser({ name: "Ethan", role: "CHILD" });
+    const parent = await createUser({ name: "Zach", role: "PARENT" });
+    const prize = await prisma.prize.create({ data: { name: "Ice cream", priceCents: 300, icon: "🍦" } });
+    await prisma.prizeAward.create({
+      data: {
+        childId: child.id,
+        prizeId: prize.id,
+        name: prize.name,
+        priceCents: prize.priceCents,
+        icon: prize.icon,
+        awardedById: parent.id,
+      },
+    });
+
+    await prisma.prize.delete({ where: { id: prize.id } });
+
+    const balance = await computeChildBalance(child.id);
+    expect(balance.totalPrizesCents).toBe(300);
+  });
 });

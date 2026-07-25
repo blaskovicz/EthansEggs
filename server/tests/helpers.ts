@@ -15,6 +15,8 @@ export async function resetDb() {
   }
 
   await prisma.payment.deleteMany();
+  await prisma.prizeAward.deleteMany();
+  await prisma.prize.deleteMany();
   await prisma.eggCollection.deleteMany();
   await prisma.settings.deleteMany();
   await prisma.user.deleteMany();

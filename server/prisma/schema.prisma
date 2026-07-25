@@ -23,6 +23,8 @@ model User {
   collections      EggCollection[] @relation("CollectorUser")
   paymentsReceived Payment[]       @relation("PaymentToChild")
   paymentsRecorded Payment[]       @relation("PaymentRecordedBy")
+  prizesReceived   PrizeAward[]    @relation("PrizeToChild")
+  prizesAwarded    PrizeAward[]    @relation("PrizeAwardedBy")
 }
 
 // Append-only log of every day a person marked they collected/helped collect eggs.
@@ -59,4 +61,34 @@ model Settings {
   rateCents     Int    @default(100)
   chickenCount  Int    @default(30)
   updatedAt     DateTime @updatedAt
+}
+
+// Persistent catalog of prizes a parent can offer (e.g. "Ice cream trip", icon + price).
+// Deleting a catalog entry doesn't touch past awards - PrizeAward snapshots its own
+// name/price/icon at award time, the same way EggCollection snapshots rateCents.
+model Prize {
+  id        String   @id @default(cuid())
+  name      String
+  priceCents Int
+  icon      String
+  createdAt DateTime @default(now())
+
+  awards PrizeAward[]
+}
+
+// Append-only log of a prize being given to a child, deducting from their balance.
+// prizeId is kept for reference but set null if the catalog entry is later deleted;
+// name/priceCents/icon are snapshotted here so history survives that deletion.
+model PrizeAward {
+  id           String   @id @default(cuid())
+  childId      String
+  child        User     @relation("PrizeToChild", fields: [childId], references: [id])
+  prizeId      String?
+  prize        Prize?   @relation(fields: [prizeId], references: [id], onDelete: SetNull)
+  name         String
+  priceCents   Int
+  icon         String
+  awardedById  String
+  awardedBy    User     @relation("PrizeAwardedBy", fields: [awardedById], references: [id])
+  createdAt    DateTime @default(now())
 }

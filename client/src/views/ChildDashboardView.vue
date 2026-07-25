@@ -5,13 +5,17 @@ import BalanceCard from "../components/BalanceCard.vue";
 import TransactionList from "../components/TransactionList.vue";
 import TodayStatusCard from "../components/TodayStatusCard.vue";
 import CollectEggsDialog from "../components/CollectEggsDialog.vue";
+import PrizeShop from "../components/PrizeShop.vue";
 import { http } from "../api/http";
 import { useAuthStore } from "../stores/auth";
-import type { AppSettings, ChildOverview, PaymentEntry, Profile, TodayEntry } from "../api/types";
+import { useForegroundRefresh } from "../lib/useForegroundRefresh";
+import type { AppSettings, ChildOverview, PaymentEntry, Prize, PrizeAward, Profile, TodayEntry } from "../api/types";
 
 const auth = useAuthStore();
 const overview = ref<ChildOverview | null>(null);
 const payments = ref<PaymentEntry[]>([]);
+const prizes = ref<Prize[]>([]);
+const prizeAwards = ref<PrizeAward[]>([]);
 const profiles = ref<Profile[]>([]);
 const todayEntries = ref<TodayEntry[]>([]);
 const marking = ref(false);
@@ -21,21 +25,30 @@ const todayStatus = ref<InstanceType<typeof TodayStatusCard> | null>(null);
 const chickenCount = ref<number>(30);
 
 async function load() {
-  const [overviewRes, paymentsRes, profilesRes, todayRes, settingsRes] = await Promise.all([
+  const [overviewRes, paymentsRes, profilesRes, todayRes, settingsRes, prizesRes, prizeAwardsRes] = await Promise.all([
     http.get<ChildOverview>("/eggs/mine"),
     http.get<PaymentEntry[]>(`/payments/user/${auth.user!.id}`),
     http.get<Profile[]>("/auth/profiles"),
     http.get<TodayEntry[]>("/eggs/today"),
     http.get<AppSettings>("/settings"),
+    http.get<Prize[]>("/prizes"),
+    http.get<PrizeAward[]>(`/prizes/awards/user/${auth.user!.id}`),
   ]);
   overview.value = overviewRes.data;
   payments.value = paymentsRes.data;
   profiles.value = profilesRes.data;
   todayEntries.value = todayRes.data;
   chickenCount.value = settingsRes.data.chickenCount;
+  prizes.value = prizesRes.data;
+  prizeAwards.value = prizeAwardsRes.data;
 }
 
 onMounted(load);
+
+useForegroundRefresh(async () => {
+  await load();
+  await todayStatus.value?.reload();
+});
 
 // Once anyone (a sibling or a parent) has logged today, the day is locked for everyone
 // else - only one person starts today's collection, naming helpers along the way.
@@ -122,11 +135,14 @@ async function undoToday() {
 
       <BalanceCard :balance="overview.balance" />
 
+      <PrizeShop :prizes="prizes" :balance-cents="overview.balance.balanceCents" />
+
       <div>
         <h2 class="mb-2 text-sm font-semibold text-stone-600">Activity</h2>
         <TransactionList
           :entries="overview.entries"
           :payments="payments"
+          :prize-awards="prizeAwards"
         />
       </div>
     </main>

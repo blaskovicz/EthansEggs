@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import request from "supertest";
 import { createApp } from "../../src/app";
+import { todayLocalDate } from "../../src/lib/balance";
 import { createUser, cookieForUser, resetDb } from "../helpers";
 
 const app = createApp();
@@ -151,6 +152,134 @@ describe("GET /api/eggs/mine", () => {
     expect(res.body.markedToday).toBe(true);
     expect(res.body.entries).toHaveLength(1);
     expect(res.body.balance.collectionsCount).toBe(1);
+  });
+});
+
+describe("POST /api/eggs/manual", () => {
+  it("requires a parent", async () => {
+    const child = await createUser({ name: "Ethan", role: "CHILD" });
+    const res = await request(app)
+      .post("/api/eggs/manual")
+      .set("Cookie", cookieForUser(child))
+      .send({ userId: child.id, date: "2026-07-23", eggCount: 13 });
+    expect(res.status).toBe(403);
+  });
+
+  it("lets a parent backdate a missed collection for a child", async () => {
+    const parent = await createUser({ name: "Zach", role: "PARENT" });
+    const child = await createUser({ name: "Ethan", role: "CHILD" });
+
+    const res = await request(app)
+      .post("/api/eggs/manual")
+      .set("Cookie", cookieForUser(parent))
+      .send({ userId: child.id, date: "2026-07-23", eggCount: 13 });
+
+    expect(res.status).toBe(201);
+    expect(res.body).toMatchObject({ userId: child.id, date: "2026-07-23", eggCount: 13, isHelper: false });
+
+    const mine = await request(app).get(`/api/eggs/user/${child.id}`).set("Cookie", cookieForUser(parent));
+    expect(mine.body.balance.collectionsCount).toBe(1);
+  });
+
+  it("404s for a non-existent or non-child target", async () => {
+    const parent = await createUser({ name: "Zach", role: "PARENT" });
+    const res = await request(app)
+      .post("/api/eggs/manual")
+      .set("Cookie", cookieForUser(parent))
+      .send({ userId: "missing", date: "2026-07-23" });
+    expect(res.status).toBe(404);
+  });
+
+  it("400s on a future date", async () => {
+    const parent = await createUser({ name: "Zach", role: "PARENT" });
+    const child = await createUser({ name: "Ethan", role: "CHILD" });
+    const res = await request(app)
+      .post("/api/eggs/manual")
+      .set("Cookie", cookieForUser(parent))
+      .send({ userId: child.id, date: "2999-01-01" });
+    expect(res.status).toBe(400);
+  });
+
+  it("409s when the child already has an entry for that date", async () => {
+    const parent = await createUser({ name: "Zach", role: "PARENT" });
+    const child = await createUser({ name: "Ethan", role: "CHILD" });
+    await request(app).post("/api/eggs/collect").set("Cookie", cookieForUser(child)).send({});
+    const today = todayLocalDate();
+
+    const res = await request(app)
+      .post("/api/eggs/manual")
+      .set("Cookie", cookieForUser(parent))
+      .send({ userId: child.id, date: today });
+    expect(res.status).toBe(409);
+  });
+});
+
+describe("PATCH /api/eggs/:id", () => {
+  it("requires a parent", async () => {
+    const child = await createUser({ name: "Ethan", role: "CHILD" });
+    const create = await request(app).post("/api/eggs/collect").set("Cookie", cookieForUser(child)).send({});
+    const res = await request(app)
+      .patch(`/api/eggs/${create.body.entry.id}`)
+      .set("Cookie", cookieForUser(child))
+      .send({ eggCount: 7 });
+    expect(res.status).toBe(403);
+  });
+
+  it("lets a parent correct an entry's egg count", async () => {
+    const parent = await createUser({ name: "Zach", role: "PARENT" });
+    const child = await createUser({ name: "Ethan", role: "CHILD" });
+    const create = await request(app)
+      .post("/api/eggs/collect")
+      .set("Cookie", cookieForUser(child))
+      .send({ eggCount: 5 });
+
+    const res = await request(app)
+      .patch(`/api/eggs/${create.body.entry.id}`)
+      .set("Cookie", cookieForUser(parent))
+      .send({ eggCount: 9 });
+
+    expect(res.status).toBe(200);
+    expect(res.body.eggCount).toBe(9);
+  });
+
+  it("404s for a missing entry", async () => {
+    const parent = await createUser({ name: "Zach", role: "PARENT" });
+    const res = await request(app)
+      .patch("/api/eggs/does-not-exist")
+      .set("Cookie", cookieForUser(parent))
+      .send({ eggCount: 3 });
+    expect(res.status).toBe(404);
+  });
+});
+
+describe("DELETE /api/eggs/:id", () => {
+  it("requires a parent", async () => {
+    const child = await createUser({ name: "Ethan", role: "CHILD" });
+    const create = await request(app).post("/api/eggs/collect").set("Cookie", cookieForUser(child)).send({});
+    const res = await request(app)
+      .delete(`/api/eggs/${create.body.entry.id}`)
+      .set("Cookie", cookieForUser(child));
+    expect(res.status).toBe(403);
+  });
+
+  it("lets a parent cancel any entry, any owner", async () => {
+    const parent = await createUser({ name: "Zach", role: "PARENT" });
+    const child = await createUser({ name: "Ethan", role: "CHILD" });
+    const create = await request(app).post("/api/eggs/collect").set("Cookie", cookieForUser(child)).send({});
+
+    const res = await request(app)
+      .delete(`/api/eggs/${create.body.entry.id}`)
+      .set("Cookie", cookieForUser(parent));
+    expect(res.status).toBe(200);
+
+    const mine = await request(app).get(`/api/eggs/user/${child.id}`).set("Cookie", cookieForUser(parent));
+    expect(mine.body.entries).toEqual([]);
+  });
+
+  it("is a no-op (still 200) for a missing entry id", async () => {
+    const parent = await createUser({ name: "Zach", role: "PARENT" });
+    const res = await request(app).delete("/api/eggs/does-not-exist").set("Cookie", cookieForUser(parent));
+    expect(res.status).toBe(200);
   });
 });
 

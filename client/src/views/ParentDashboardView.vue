@@ -5,9 +5,11 @@ import ParentChildCard from "../components/ParentChildCard.vue";
 import ParentHistoryCard from "../components/ParentHistoryCard.vue";
 import TodayStatusCard from "../components/TodayStatusCard.vue";
 import CollectEggsDialog from "../components/CollectEggsDialog.vue";
+import PrizeManager from "../components/PrizeManager.vue";
 import { http } from "../api/http";
 import { useAuthStore } from "../stores/auth";
-import type { AppSettings, ChildBalance, ParentSummary, TodayEntry } from "../api/types";
+import { useForegroundRefresh } from "../lib/useForegroundRefresh";
+import type { AppSettings, ChildBalance, ParentSummary, Prize, TodayEntry } from "../api/types";
 
 const auth = useAuthStore();
 const children = ref<ChildBalance[]>([]);
@@ -28,6 +30,7 @@ const marking = ref(false);
 const markError = ref("");
 const todayStatus = ref<InstanceType<typeof TodayStatusCard> | null>(null);
 const historyRefreshKey = ref(0);
+const prizes = ref<Prize[]>([]);
 
 async function loadChildren() {
   const { data } = await http.get<ChildBalance[]>("/users/children");
@@ -52,11 +55,22 @@ async function loadToday() {
   todayEntries.value = data;
 }
 
+async function loadPrizes() {
+  const { data } = await http.get<Prize[]>("/prizes");
+  prizes.value = data;
+}
+
 onMounted(() => {
   loadChildren();
   loadParents();
   loadSettings();
   loadToday();
+  loadPrizes();
+});
+
+useForegroundRefresh(async () => {
+  await Promise.all([loadChildren(), loadParents(), loadSettings(), loadToday(), loadPrizes()]);
+  await todayStatus.value?.reload();
 });
 
 const markedByMeToday = computed(() => todayEntries.value.some((e) => e.userId === auth.user?.id));
@@ -250,12 +264,15 @@ async function undoToday() {
       </div>
       <p v-if="chickenCountSaved" class="-mt-3 text-center text-xs text-emerald-600">Chicken count updated</p>
 
+      <PrizeManager :prizes="prizes" @changed="loadPrizes" />
+
       <div class="space-y-3">
         <h2 class="text-sm font-semibold text-stone-600">Kids</h2>
         <ParentChildCard
           v-for="c in children"
           :key="c.userId"
           :balance="c"
+          :prizes="prizes"
           @changed="loadChildren"
         />
       </div>

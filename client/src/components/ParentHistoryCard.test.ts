@@ -25,6 +25,7 @@ const overview: ChildOverview = {
     rateCents: 100,
     totalOwedCents: 100,
     totalPaidCents: 0,
+    totalPrizesCents: 0,
     balanceCents: 100,
   },
   entries: [
