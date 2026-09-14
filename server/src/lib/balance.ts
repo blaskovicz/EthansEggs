@@ -18,12 +18,13 @@ export interface ChildBalance {
   rateCents: number;
   totalOwedCents: number;
   totalPaidCents: number;
+  totalCreditsCents: number;
   totalPrizesCents: number;
   balanceCents: number;
 }
 
 export async function computeChildBalance(userId: string): Promise<ChildBalance> {
-  const [user, collectionsAgg, payments, prizeAwards, rateCents] = await Promise.all([
+  const [user, collectionsAgg, paymentsByType, prizeAwards, rateCents] = await Promise.all([
     prisma.user.findUniqueOrThrow({ where: { id: userId } }),
     // Sum each collection's own snapshotted rate rather than count * current rate,
     // so a later rate change doesn't retroactively reprice past collections.
@@ -32,7 +33,7 @@ export async function computeChildBalance(userId: string): Promise<ChildBalance>
       _count: { _all: true },
       _sum: { rateCents: true },
     }),
-    prisma.payment.aggregate({ where: { childId: userId }, _sum: { amountCents: true } }),
+    prisma.payment.groupBy({ by: ["type"], where: { childId: userId }, _sum: { amountCents: true } }),
     // Sum each award's own snapshotted priceCents, so a later catalog price change
     // (or the prize being deleted) doesn't retroactively reprice past awards.
     prisma.prizeAward.aggregate({ where: { childId: userId }, _sum: { priceCents: true } }),
@@ -41,7 +42,8 @@ export async function computeChildBalance(userId: string): Promise<ChildBalance>
 
   const collectionsCount = collectionsAgg._count._all;
   const totalOwedCents = collectionsAgg._sum.rateCents ?? 0;
-  const totalPaidCents = payments._sum.amountCents ?? 0;
+  const totalPaidCents = paymentsByType.find((p) => p.type === "DEBIT")?._sum.amountCents ?? 0;
+  const totalCreditsCents = paymentsByType.find((p) => p.type === "CREDIT")?._sum.amountCents ?? 0;
   const totalPrizesCents = prizeAwards._sum.priceCents ?? 0;
 
   return {
@@ -52,8 +54,9 @@ export async function computeChildBalance(userId: string): Promise<ChildBalance>
     rateCents,
     totalOwedCents,
     totalPaidCents,
+    totalCreditsCents,
     totalPrizesCents,
-    balanceCents: totalOwedCents - totalPaidCents - totalPrizesCents,
+    balanceCents: totalOwedCents + totalCreditsCents - totalPaidCents - totalPrizesCents,
   };
 }
 

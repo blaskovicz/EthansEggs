@@ -43,16 +43,22 @@ model EggCollection {
   @@unique([userId, date])
 }
 
-// Append-only log of every payment made toward a child's balance.
+enum PaymentType {
+  CREDIT // parent adds money to the child's wallet directly (allowance, gift) - increases balance
+  DEBIT // money paid out to the child, discharging what's owed - decreases balance
+}
+
+// Append-only log of every credit/debit to a child's wallet.
 model Payment {
-  id              String   @id @default(cuid())
+  id              String      @id @default(cuid())
   childId         String
-  child           User     @relation("PaymentToChild", fields: [childId], references: [id])
+  child           User        @relation("PaymentToChild", fields: [childId], references: [id])
+  type            PaymentType @default(DEBIT)
   amountCents     Int
   note            String?
   recordedById    String
-  recordedBy      User     @relation("PaymentRecordedBy", fields: [recordedById], references: [id])
-  createdAt       DateTime @default(now())
+  recordedBy      User        @relation("PaymentRecordedBy", fields: [recordedById], references: [id])
+  createdAt       DateTime    @default(now())
 }
 
 // Single-row app-wide configuration (currently just the per-collection rate and coop size).

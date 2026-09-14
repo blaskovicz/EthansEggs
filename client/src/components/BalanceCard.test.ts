@@ -11,6 +11,7 @@ const balance: ChildBalance = {
   rateCents: 100,
   totalOwedCents: 400,
   totalPaidCents: 150,
+  totalCreditsCents: 0,
   totalPrizesCents: 0,
   balanceCents: 250,
 };
@@ -29,5 +30,17 @@ describe("BalanceCard", () => {
     const wrapper = mount(BalanceCard, { props: { balance: { ...balance, totalPrizesCents: 300 } } });
     expect(wrapper.text()).toContain("$3.00");
     expect(wrapper.text()).toContain("prizes");
+  });
+
+  it("hides the credited tile when there are no credits", () => {
+    const wrapper = mount(BalanceCard, { props: { balance } });
+    expect(wrapper.text()).not.toContain("credited");
+  });
+
+  it("shows the credited tile once the child has been credited", () => {
+    const wrapper = mount(BalanceCard, { props: { balance: { ...balance, totalCreditsCents: 1000 } } });
+    const text = wrapper.text();
+    expect(text).toContain("credited");
+    expect(text).toContain("$10.00");
   });
 });
