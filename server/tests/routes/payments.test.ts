@@ -20,7 +20,7 @@ describe("POST /api/payments", () => {
     expect(res.status).toBe(403);
   });
 
-  it("records a payment for a child, converting dollars to cents", async () => {
+  it("records a payment for a child, converting dollars to cents, defaulting to a debit", async () => {
     const parent = await createUser({ name: "Zach", role: "PARENT" });
     const child = await createUser({ name: "Ethan", role: "CHILD" });
 
@@ -30,7 +30,20 @@ describe("POST /api/payments", () => {
       .send({ childId: child.id, amount: 12.5, note: "allowance" });
 
     expect(res.status).toBe(201);
-    expect(res.body).toMatchObject({ childId: child.id, amountCents: 1250, note: "allowance" });
+    expect(res.body).toMatchObject({ childId: child.id, amountCents: 1250, type: "DEBIT", note: "allowance" });
+  });
+
+  it("records a credit when type is CREDIT", async () => {
+    const parent = await createUser({ name: "Zach", role: "PARENT" });
+    const child = await createUser({ name: "Ethan", role: "CHILD" });
+
+    const res = await request(app)
+      .post("/api/payments")
+      .set("Cookie", cookieForUser(parent))
+      .send({ childId: child.id, amount: 10, type: "CREDIT", note: "allowance" });
+
+    expect(res.status).toBe(201);
+    expect(res.body).toMatchObject({ childId: child.id, amountCents: 1000, type: "CREDIT" });
   });
 
   it("404s for a non-existent or non-child target", async () => {

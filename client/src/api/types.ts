@@ -36,14 +36,18 @@ export interface ChildBalance {
   rateCents: number;
   totalOwedCents: number;
   totalPaidCents: number;
+  totalCreditsCents: number;
   totalPrizesCents: number;
   balanceCents: number;
 }
+
+export type PaymentType = "CREDIT" | "DEBIT";
 
 export interface PaymentEntry {
   id: string;
   childId: string;
   amountCents: number;
+  type: PaymentType;
   note: string | null;
   recordedById: string;
   recordedBy: { name: string };

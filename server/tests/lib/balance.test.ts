@@ -41,6 +41,7 @@ describe("computeChildBalance", () => {
       rateCents: 100,
       totalOwedCents: 0,
       totalPaidCents: 0,
+      totalCreditsCents: 0,
       balanceCents: 0,
     });
   });
@@ -58,7 +59,7 @@ describe("computeChildBalance", () => {
       ],
     });
     await prisma.payment.create({
-      data: { childId: child.id, amountCents: 200, recordedById: parent.id },
+      data: { childId: child.id, amountCents: 200, type: "DEBIT", recordedById: parent.id },
     });
 
     const balance = await computeChildBalance(child.id);
@@ -66,6 +67,23 @@ describe("computeChildBalance", () => {
     expect(balance.totalOwedCents).toBe(450);
     expect(balance.totalPaidCents).toBe(200);
     expect(balance.balanceCents).toBe(250);
+  });
+
+  it("adds credits directly to the balance, separately from debits", async () => {
+    const child = await createUser({ name: "Ethan", role: "CHILD" });
+    const parent = await createUser({ name: "Zach", role: "PARENT" });
+
+    await prisma.payment.create({
+      data: { childId: child.id, amountCents: 1000, type: "CREDIT", recordedById: parent.id },
+    });
+    await prisma.payment.create({
+      data: { childId: child.id, amountCents: 300, type: "DEBIT", recordedById: parent.id },
+    });
+
+    const balance = await computeChildBalance(child.id);
+    expect(balance.totalCreditsCents).toBe(1000);
+    expect(balance.totalPaidCents).toBe(300);
+    expect(balance.balanceCents).toBe(700);
   });
 
   it("counts collections marked as helper the same as a direct collection", async () => {

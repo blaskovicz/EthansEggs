@@ -4,7 +4,7 @@ import { http } from "../api/http";
 import { formatCents } from "../lib/format";
 import { todayLocalDate } from "../lib/today";
 import TransactionList from "./TransactionList.vue";
-import type { ChildBalance, ChildOverview, PaymentEntry, Prize, PrizeAward } from "../api/types";
+import type { ChildBalance, ChildOverview, PaymentEntry, PaymentType, Prize, PrizeAward } from "../api/types";
 
 const props = defineProps<{ balance: ChildBalance; prizes: Prize[] }>();
 const emit = defineEmits<{ changed: [] }>();
@@ -17,6 +17,7 @@ const loading = ref(false);
 
 const amount = ref("");
 const note = ref("");
+const paymentType = ref<PaymentType>("DEBIT");
 const submitting = ref(false);
 const formError = ref("");
 
@@ -64,7 +65,12 @@ async function recordPayment() {
   }
   submitting.value = true;
   try {
-    await http.post("/payments", { childId: props.balance.userId, amount: value, note: note.value || undefined });
+    await http.post("/payments", {
+      childId: props.balance.userId,
+      amount: value,
+      type: paymentType.value,
+      note: note.value || undefined,
+    });
     amount.value = "";
     note.value = "";
     await loadDetail();
@@ -165,6 +171,27 @@ async function awardPrize(prizeId: string) {
 
     <div v-if="expanded" class="border-t border-stone-100 px-5 py-4">
       <form class="mb-4 flex flex-wrap items-end gap-2" @submit.prevent="recordPayment">
+        <div>
+          <label class="mb-1 block text-xs text-stone-500">Type</label>
+          <div class="flex rounded-lg border border-stone-300 p-0.5 text-sm">
+            <button
+              type="button"
+              class="rounded-md px-2.5 py-1 font-medium transition"
+              :class="paymentType === 'CREDIT' ? 'bg-emerald-500 text-white' : 'text-stone-500 hover:text-stone-700'"
+              @click="paymentType = 'CREDIT'"
+            >
+              Credit
+            </button>
+            <button
+              type="button"
+              class="rounded-md px-2.5 py-1 font-medium transition"
+              :class="paymentType === 'DEBIT' ? 'bg-stone-600 text-white' : 'text-stone-500 hover:text-stone-700'"
+              @click="paymentType = 'DEBIT'"
+            >
+              Debit
+            </button>
+          </div>
+        </div>
         <div class="flex-1 min-w-[100px]">
           <label class="mb-1 block text-xs text-stone-500">Amount</label>
           <input
@@ -190,7 +217,7 @@ async function awardPrize(prizeId: string) {
           :disabled="submitting"
           class="rounded-lg bg-emerald-500 px-3 py-1.5 text-sm font-medium text-white hover:bg-emerald-600 disabled:opacity-50"
         >
-          Record payment
+          {{ paymentType === "CREDIT" ? "Record credit" : "Record debit" }}
         </button>
       </form>
       <p v-if="formError" class="mb-3 text-sm text-red-600">{{ formError }}</p>

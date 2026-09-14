@@ -30,6 +30,7 @@ function payment(overrides: Partial<PaymentEntry> = {}): PaymentEntry {
     id: "p1",
     childId: "u1",
     amountCents: 500,
+    type: "DEBIT",
     note: null,
     recordedById: "parent1",
     recordedBy: { name: "Zach" },
@@ -86,6 +87,30 @@ describe("TransactionList", () => {
       props: { entries: [], payments: [payment({ note: null })] },
     });
     expect(wrapper.text()).toContain("Payment from Zach");
+  });
+
+  it("shows a credit as a positive amount with its own label and icon", () => {
+    const wrapper = mount(TransactionList, {
+      props: { entries: [], payments: [payment({ type: "CREDIT", amountCents: 1000, note: "allowance" })] },
+    });
+    const text = wrapper.text();
+    expect(text).toContain("Credit: allowance (Zach)");
+    expect(text).toContain("+$10.00");
+    expect(text).toContain("💰");
+  });
+
+  it("falls back to a generic credit label without a note", () => {
+    const wrapper = mount(TransactionList, {
+      props: { entries: [], payments: [payment({ type: "CREDIT", note: null })] },
+    });
+    expect(wrapper.text()).toContain("Credit from Zach");
+  });
+
+  it("still shows a debit as a negative amount", () => {
+    const wrapper = mount(TransactionList, {
+      props: { entries: [], payments: [payment({ type: "DEBIT", amountCents: 500 })] },
+    });
+    expect(wrapper.text()).toContain("-$5.00");
   });
 
   it("shows each entry's own snapshotted rate, not a single current rate", () => {

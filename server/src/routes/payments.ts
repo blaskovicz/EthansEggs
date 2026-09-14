@@ -9,16 +9,18 @@ router.use(requireAuth);
 const createPaymentSchema = z.object({
   childId: z.string().min(1),
   amount: z.number().positive(),
+  type: z.enum(["CREDIT", "DEBIT"]).default("DEBIT"),
   note: z.string().max(280).optional(),
 });
 
-// Parents record a true-up payment made to a child.
+// Parents record a credit (adding money to a child's wallet, e.g. allowance) or a
+// debit (paying out money, discharging what's owed) against a child's balance.
 router.post("/", requireParent, async (req, res) => {
   const parsed = createPaymentSchema.safeParse(req.body);
   if (!parsed.success) {
     return res.status(400).json({ error: parsed.error.issues[0]?.message ?? "Invalid input" });
   }
-  const { childId, amount, note } = parsed.data;
+  const { childId, amount, type, note } = parsed.data;
 
   const child = await prisma.user.findUnique({ where: { id: childId } });
   if (!child || child.role !== "CHILD") {
@@ -29,6 +31,7 @@ router.post("/", requireParent, async (req, res) => {
     data: {
       childId,
       amountCents: Math.round(amount * 100),
+      type,
       note,
       recordedById: req.user!.userId,
     },

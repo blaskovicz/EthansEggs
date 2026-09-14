@@ -40,14 +40,24 @@ const timeline = computed<TimelineItem[]>(() => {
       eggCount: e.eggCount,
     };
   });
-  const payments: TimelineItem[] = props.payments.map((p) => ({
-    kind: "payment",
-    id: p.id,
-    when: p.createdAt,
-    label: p.note ? `Paid: ${p.note} (${p.recordedBy.name})` : `Payment from ${p.recordedBy.name}`,
-    amountCents: -p.amountCents,
-    icon: "💵",
-  }));
+  const payments: TimelineItem[] = props.payments.map((p) => {
+    const isCredit = p.type === "CREDIT";
+    const label = isCredit
+      ? p.note
+        ? `Credit: ${p.note} (${p.recordedBy.name})`
+        : `Credit from ${p.recordedBy.name}`
+      : p.note
+        ? `Paid: ${p.note} (${p.recordedBy.name})`
+        : `Payment from ${p.recordedBy.name}`;
+    return {
+      kind: "payment",
+      id: p.id,
+      when: p.createdAt,
+      label,
+      amountCents: isCredit ? p.amountCents : -p.amountCents,
+      icon: isCredit ? "💰" : "💵",
+    };
+  });
   const prizes: TimelineItem[] = props.prizeAwards.map((p) => ({
     kind: "prize",
     id: p.id,

@@ -20,7 +20,7 @@ defineProps<{ balance: ChildBalance }>();
       <span class="text-4xl">🥚</span>
     </div>
 
-    <div class="mt-4 grid grid-cols-4 gap-2 text-center">
+    <div class="mt-4 grid gap-2 text-center" :class="balance.totalCreditsCents > 0 ? 'grid-cols-5' : 'grid-cols-4'">
       <div class="rounded-lg bg-stone-50 py-2">
         <p class="text-lg font-semibold text-stone-800">{{ balance.collectionsCount }}</p>
         <p class="text-[11px] text-stone-500">collections</p>
@@ -28,6 +28,10 @@ defineProps<{ balance: ChildBalance }>();
       <div class="rounded-lg bg-stone-50 py-2">
         <p class="text-lg font-semibold text-stone-800">{{ formatCents(balance.totalOwedCents) }}</p>
         <p class="text-[11px] text-stone-500">earned</p>
+      </div>
+      <div v-if="balance.totalCreditsCents > 0" class="rounded-lg bg-stone-50 py-2">
+        <p class="text-lg font-semibold text-stone-800">{{ formatCents(balance.totalCreditsCents) }}</p>
+        <p class="text-[11px] text-stone-500">credited</p>
       </div>
       <div class="rounded-lg bg-stone-50 py-2">
         <p class="text-lg font-semibold text-stone-800">{{ formatCents(balance.totalPaidCents) }}</p>

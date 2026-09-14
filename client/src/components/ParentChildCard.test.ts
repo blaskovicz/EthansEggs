@@ -25,6 +25,7 @@ const balance: ChildBalance = {
   rateCents: 100,
   totalOwedCents: 100,
   totalPaidCents: 0,
+  totalCreditsCents: 0,
   totalPrizesCents: 0,
   balanceCents: 100,
 };
@@ -81,7 +82,7 @@ describe("ParentChildCard", () => {
     expect(mockedHttp.get).toHaveBeenCalledWith("/prizes/awards/user/u1");
   });
 
-  it("records a payment and reloads", async () => {
+  it("records a debit by default and reloads", async () => {
     const wrapper = await mountExpanded();
     mockedHttp.post.mockResolvedValueOnce({ data: { id: "pay1" } });
 
@@ -89,7 +90,31 @@ describe("ParentChildCard", () => {
     await wrapper.find("form").trigger("submit.prevent");
     await flushPromises();
 
-    expect(mockedHttp.post).toHaveBeenCalledWith("/payments", { childId: "u1", amount: 5, note: undefined });
+    expect(mockedHttp.post).toHaveBeenCalledWith("/payments", {
+      childId: "u1",
+      amount: 5,
+      type: "DEBIT",
+      note: undefined,
+    });
+    expect(wrapper.emitted("changed")).toBeTruthy();
+  });
+
+  it("records a credit when the Credit toggle is selected", async () => {
+    const wrapper = await mountExpanded();
+    mockedHttp.post.mockResolvedValueOnce({ data: { id: "pay1" } });
+
+    const creditButton = wrapper.findAll("button").find((b) => b.text() === "Credit")!;
+    await creditButton.trigger("click");
+    await wrapper.find("input[placeholder='5.00']").setValue("10");
+    await wrapper.find("form").trigger("submit.prevent");
+    await flushPromises();
+
+    expect(mockedHttp.post).toHaveBeenCalledWith("/payments", {
+      childId: "u1",
+      amount: 10,
+      type: "CREDIT",
+      note: undefined,
+    });
     expect(wrapper.emitted("changed")).toBeTruthy();
   });
 
