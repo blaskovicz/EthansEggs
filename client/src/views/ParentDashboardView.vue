@@ -9,6 +9,7 @@ import PrizeManager from "../components/PrizeManager.vue";
 import { http } from "../api/http";
 import { useAuthStore } from "../stores/auth";
 import { useForegroundRefresh } from "../lib/useForegroundRefresh";
+import { usePolling } from "../lib/usePolling";
 import type { AppSettings, ChildBalance, ParentSummary, Prize, TodayEntry } from "../api/types";
 
 const auth = useAuthStore();
@@ -69,6 +70,11 @@ onMounted(() => {
 });
 
 useForegroundRefresh(async () => {
+  await Promise.all([loadChildren(), loadParents(), loadSettings(), loadToday(), loadPrizes()]);
+  await todayStatus.value?.reload();
+});
+
+usePolling(async () => {
   await Promise.all([loadChildren(), loadParents(), loadSettings(), loadToday(), loadPrizes()]);
   await todayStatus.value?.reload();
 });

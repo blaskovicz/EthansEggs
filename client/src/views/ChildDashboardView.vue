@@ -9,6 +9,7 @@ import PrizeShop from "../components/PrizeShop.vue";
 import { http } from "../api/http";
 import { useAuthStore } from "../stores/auth";
 import { useForegroundRefresh } from "../lib/useForegroundRefresh";
+import { usePolling } from "../lib/usePolling";
 import type { AppSettings, ChildOverview, PaymentEntry, Prize, PrizeAward, Profile, TodayEntry } from "../api/types";
 
 const auth = useAuthStore();
@@ -46,6 +47,11 @@ async function load() {
 onMounted(load);
 
 useForegroundRefresh(async () => {
+  await load();
+  await todayStatus.value?.reload();
+});
+
+usePolling(async () => {
   await load();
   await todayStatus.value?.reload();
 });
