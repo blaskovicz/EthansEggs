@@ -1,4 +1,4 @@
-syntax=docker/dockerfile:1
+# syntax=docker/dockerfile:1
 
 FROM node:20-bookworm-slim AS client-build
 WORKDIR /app/client

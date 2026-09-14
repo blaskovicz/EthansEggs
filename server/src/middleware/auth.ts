@@ -1,8 +1,14 @@
 import { Request, Response, NextFunction } from "express";
 import jwt from "jsonwebtoken";
+import { readFileSync } from "fs";
 import { Role } from "@prisma/client";
 
-const JWT_SECRET = process.env.JWT_SECRET as string;
+// In Docker, the secret is mounted as a file (via Compose `secrets:`) rather than
+// passed as a plain env var, so it doesn't show up in `docker inspect` or process
+// env dumps. JWT_SECRET is kept as a fallback for local dev via .env.
+const JWT_SECRET = process.env.JWT_SECRET_FILE
+  ? readFileSync(process.env.JWT_SECRET_FILE, "utf8").trim()
+  : (process.env.JWT_SECRET as string);
 const COOKIE_NAME = "eggs_session";
 
 export interface AuthTokenPayload {

@@ -5,6 +5,7 @@ dist
 .git
 .env
 .env.test
+secrets
 *.log
 server/prisma/*.db
 server/prisma/*.db-journal

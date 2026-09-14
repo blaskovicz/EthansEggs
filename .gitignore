@@ -3,6 +3,9 @@ dist
 .env
 *.log
 
+# Docker secrets (JWT signing key, etc.) - generated per-box, never source
+secrets/
+
 # SQLite database - contains real household data, not source
 server/prisma/dev.db
 server/prisma/dev.db-journal
