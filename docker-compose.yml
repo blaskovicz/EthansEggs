@@ -1,0 +1,13 @@
+services:
+  ethans-eggs:
+    build: .
+    restart: unless-stopped
+    ports:
+      - "4000:4000"
+    environment:
+      NODE_ENV: production
+      PORT: "4000"
+      DATABASE_URL: "file:/data/prod.db"
+      JWT_SECRET: "${JWT_SECRET}"
+    volumes:
+      - ${DATA_DIR:-/srv/ethans-eggs/data}:/data
