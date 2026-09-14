@@ -13,6 +13,13 @@ services:
       - ${DATA_DIR:-/srv/ethans-eggs/data}:/data
     secrets:
       - jwt_secret
+    networks:
+      - default
+      - gateway
+
+networks:
+  gateway:
+    external: true
 
 secrets:
   jwt_secret:
