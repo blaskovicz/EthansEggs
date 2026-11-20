@@ -159,7 +159,7 @@ async function undoToday() {
     <AppHeader />
 
     <main class="mx-auto max-w-lg space-y-5 px-4 sm:px-0">
-      <LastUpdatedBadge :label="lastUpdatedLabel" class="-mb-2" />
+      <LastUpdatedBadge :label="lastUpdatedLabel" />
 
       <div class="rounded-2xl bg-white p-5 text-center shadow-sm ring-1 ring-stone-200">
         <p v-if="markedByMeToday" class="text-sm font-medium text-emerald-600">
