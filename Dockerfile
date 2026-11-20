@@ -4,6 +4,10 @@ FROM node:22-bookworm-slim AS client-build
 WORKDIR /app/client
 COPY client/package*.json ./
 RUN npm ci
+# Placed after npm ci so the dependency-install layer still caches across
+# commits - only this build step re-runs when the commit (and source) changes.
+ARG GIT_COMMIT_HASH=""
+ENV VITE_GIT_COMMIT_HASH=$GIT_COMMIT_HASH
 COPY client/ ./
 RUN npm run build
 
