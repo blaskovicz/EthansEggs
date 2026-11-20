@@ -7,9 +7,9 @@ on:
     branches: [main]
 
 env:
-  # node:20-bookworm-slim is what Dockerfile ships, so test/build here on the
+  # node:22-bookworm-slim is what Dockerfile ships, so test/build here on the
   # same major version rather than whatever "latest" happens to be.
-  NODE_VERSION: "20"
+  NODE_VERSION: "22"
   IMAGE_NAME: ghcr.io/blaskovicz/ethanseggs
 
 jobs:

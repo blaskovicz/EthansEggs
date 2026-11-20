@@ -1,13 +1,13 @@
 # syntax=docker/dockerfile:1
 
-FROM node:20-bookworm-slim AS client-build
+FROM node:22-bookworm-slim AS client-build
 WORKDIR /app/client
 COPY client/package*.json ./
 RUN npm ci
 COPY client/ ./
 RUN npm run build
 
-FROM node:20-bookworm-slim AS server-build
+FROM node:22-bookworm-slim AS server-build
 WORKDIR /app/server
 COPY server/package*.json ./
 RUN npm ci
@@ -15,7 +15,7 @@ COPY server/ ./
 RUN npx prisma generate
 RUN npm run build
 
-FROM node:20-bookworm-slim AS runtime
+FROM node:22-bookworm-slim AS runtime
 RUN apt-get update -y && apt-get install -y --no-install-recommends openssl \
   && rm -rf /var/lib/apt/lists/*
 ENV NODE_ENV=production
