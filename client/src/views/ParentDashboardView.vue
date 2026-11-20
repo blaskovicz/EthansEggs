@@ -10,6 +10,7 @@ import { http } from "../api/http";
 import { useAuthStore } from "../stores/auth";
 import { useForegroundRefresh } from "../lib/useForegroundRefresh";
 import { usePolling } from "../lib/usePolling";
+import { useLastUpdated } from "../lib/useLastUpdated";
 import type { AppSettings, ChildBalance, ParentSummary, Prize, TodayEntry } from "../api/types";
 
 const auth = useAuthStore();
@@ -32,6 +33,7 @@ const markError = ref("");
 const todayStatus = ref<InstanceType<typeof TodayStatusCard> | null>(null);
 const historyRefreshKey = ref(0);
 const prizes = ref<Prize[]>([]);
+const { label: lastUpdatedLabel, markUpdated } = useLastUpdated();
 
 async function loadChildren() {
   const { data } = await http.get<ChildBalance[]>("/users/children");
@@ -61,22 +63,21 @@ async function loadPrizes() {
   prizes.value = data;
 }
 
-onMounted(() => {
-  loadChildren();
-  loadParents();
-  loadSettings();
-  loadToday();
-  loadPrizes();
+onMounted(async () => {
+  await Promise.all([loadChildren(), loadParents(), loadSettings(), loadToday(), loadPrizes()]);
+  markUpdated();
 });
 
 useForegroundRefresh(async () => {
   await Promise.all([loadChildren(), loadParents(), loadSettings(), loadToday(), loadPrizes()]);
   await todayStatus.value?.reload();
+  markUpdated();
 });
 
 usePolling(async () => {
   await Promise.all([loadChildren(), loadParents(), loadSettings(), loadToday(), loadPrizes()]);
   await todayStatus.value?.reload();
+  markUpdated();
 });
 
 const markedByMeToday = computed(() => todayEntries.value.some((e) => e.userId === auth.user?.id));
@@ -129,6 +130,7 @@ async function submitCollection(payload: { eggCount?: number }) {
     await loadParents();
     await todayStatus.value?.reload();
     historyRefreshKey.value++;
+    markUpdated();
   } catch (e: any) {
     markError.value = e.message;
   } finally {
@@ -144,6 +146,7 @@ async function undoToday() {
     await loadParents();
     await todayStatus.value?.reload();
     historyRefreshKey.value++;
+    markUpdated();
   } finally {
     marking.value = false;
   }
@@ -155,6 +158,8 @@ async function undoToday() {
     <AppHeader />
 
     <main class="mx-auto max-w-lg space-y-5 px-4 sm:px-0">
+      <p v-if="lastUpdatedLabel" class="-mb-2 text-center text-xs text-stone-400">🔄 {{ lastUpdatedLabel }}</p>
+
       <div class="rounded-2xl bg-white p-5 text-center shadow-sm ring-1 ring-stone-200">
         <p v-if="markedByMeToday" class="text-sm font-medium text-emerald-600">
           ✅ You logged today's collection

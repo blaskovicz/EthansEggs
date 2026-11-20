@@ -10,6 +10,7 @@ import { http } from "../api/http";
 import { useAuthStore } from "../stores/auth";
 import { useForegroundRefresh } from "../lib/useForegroundRefresh";
 import { usePolling } from "../lib/usePolling";
+import { useLastUpdated } from "../lib/useLastUpdated";
 import type { AppSettings, ChildOverview, PaymentEntry, Prize, PrizeAward, Profile, TodayEntry } from "../api/types";
 
 const auth = useAuthStore();
@@ -24,6 +25,7 @@ const markError = ref("");
 const showDialog = ref(false);
 const todayStatus = ref<InstanceType<typeof TodayStatusCard> | null>(null);
 const chickenCount = ref<number>(30);
+const { label: lastUpdatedLabel, markUpdated } = useLastUpdated();
 
 async function load() {
   const [overviewRes, paymentsRes, profilesRes, todayRes, settingsRes, prizesRes, prizeAwardsRes] = await Promise.all([
@@ -42,6 +44,7 @@ async function load() {
   chickenCount.value = settingsRes.data.chickenCount;
   prizes.value = prizesRes.data;
   prizeAwards.value = prizeAwardsRes.data;
+  markUpdated();
 }
 
 onMounted(load);
@@ -109,6 +112,7 @@ async function undoToday() {
     <main v-if="overview" class="mx-auto max-w-md space-y-5 px-4 sm:px-0">
       <div class="text-center">
         <h1 class="text-xl font-semibold text-stone-800">Hi, {{ auth.user?.name }}! 👋</h1>
+        <p v-if="lastUpdatedLabel" class="mt-1 text-xs text-stone-400">🔄 {{ lastUpdatedLabel }}</p>
       </div>
 
       <div class="rounded-2xl bg-white p-5 text-center shadow-sm ring-1 ring-stone-200">
