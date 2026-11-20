@@ -5,6 +5,7 @@ services:
     environment:
       NODE_ENV: production
       PORT: "4000"
+      TZ: America/New_York  # "today" for daily egg lock must be household-local, not UTC
       DATABASE_URL: "file:/data/prod.db"
       JWT_SECRET_FILE: /run/secrets/jwt_secret
     volumes:
