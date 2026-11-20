@@ -6,6 +6,7 @@ import TransactionList from "../components/TransactionList.vue";
 import TodayStatusCard from "../components/TodayStatusCard.vue";
 import CollectEggsDialog from "../components/CollectEggsDialog.vue";
 import PrizeShop from "../components/PrizeShop.vue";
+import LastUpdatedBadge from "../components/LastUpdatedBadge.vue";
 import { http } from "../api/http";
 import { useAuthStore } from "../stores/auth";
 import { useForegroundRefresh } from "../lib/useForegroundRefresh";
@@ -112,7 +113,7 @@ async function undoToday() {
     <main v-if="overview" class="mx-auto max-w-md space-y-5 px-4 sm:px-0">
       <div class="text-center">
         <h1 class="text-xl font-semibold text-stone-800">Hi, {{ auth.user?.name }}! 👋</h1>
-        <p v-if="lastUpdatedLabel" class="mt-1 text-xs text-stone-400">🔄 {{ lastUpdatedLabel }}</p>
+        <LastUpdatedBadge :label="lastUpdatedLabel" class="mt-1" />
       </div>
 
       <div class="rounded-2xl bg-white p-5 text-center shadow-sm ring-1 ring-stone-200">

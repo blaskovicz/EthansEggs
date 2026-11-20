@@ -6,6 +6,7 @@ import ParentHistoryCard from "../components/ParentHistoryCard.vue";
 import TodayStatusCard from "../components/TodayStatusCard.vue";
 import CollectEggsDialog from "../components/CollectEggsDialog.vue";
 import PrizeManager from "../components/PrizeManager.vue";
+import LastUpdatedBadge from "../components/LastUpdatedBadge.vue";
 import { http } from "../api/http";
 import { useAuthStore } from "../stores/auth";
 import { useForegroundRefresh } from "../lib/useForegroundRefresh";
@@ -158,7 +159,7 @@ async function undoToday() {
     <AppHeader />
 
     <main class="mx-auto max-w-lg space-y-5 px-4 sm:px-0">
-      <p v-if="lastUpdatedLabel" class="-mb-2 text-center text-xs text-stone-400">🔄 {{ lastUpdatedLabel }}</p>
+      <LastUpdatedBadge :label="lastUpdatedLabel" class="-mb-2" />
 
       <div class="rounded-2xl bg-white p-5 text-center shadow-sm ring-1 ring-stone-200">
         <p v-if="markedByMeToday" class="text-sm font-medium text-emerald-600">
