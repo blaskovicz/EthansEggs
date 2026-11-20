@@ -1,6 +1,6 @@
 services:
   ethans-eggs:
-    build: .
+    image: ghcr.io/blaskovicz/ethanseggs:${IMAGE_TAG:-latest}
     restart: unless-stopped
     environment:
       NODE_ENV: production
